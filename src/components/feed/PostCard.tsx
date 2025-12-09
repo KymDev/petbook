@@ -54,24 +54,14 @@ export const PostCard = ({ post }: PostCardProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
-  const [pet, setPet] = useState<Pet | null>(post.pet || null);
+  const [pet, setPet] = useState<Pet | null>(post.pet as Pet || null);
 
   useEffect(() => {
-    fetchPetAndReactions();
+    fetchReactions();
     fetchComments();
   }, [post.id]);
 
-  const fetchPetAndReactions = async () => {
-    // Fetch pet info
-    if (!post.pet) {
-      const { data: petData } = await supabase
-        .from("pets")
-        .select("*")
-        .eq("id", post.pet_id)
-        .single();
-      if (petData) setPet(petData);
-    }
-
+  const fetchReactions = async () => {
     // Fetch reactions
     const { data: allReactions } = await supabase
       .from("reactions")
@@ -131,7 +121,7 @@ export const PostCard = ({ post }: PostCardProps) => {
       }]);
     }
 
-    fetchPetAndReactions();
+    fetchReactions();
   };
 
   const handleComment = async () => {

@@ -26,6 +26,7 @@ import {
   Menu,
   X,
   PawPrint,
+  Sparkles,
 } from "lucide-react";
 
 interface MainLayoutProps {
@@ -34,6 +35,7 @@ interface MainLayoutProps {
 
 const navItems = [
   { href: "/feed", icon: Home, label: "Feed" },
+  { href: "/create-story", icon: Sparkles, label: "Story" },
   { href: "/explore", icon: Search, label: "Explorar" },
   { href: "/create-post", icon: PlusCircle, label: "Postar" },
   { href: "/chat", icon: MessageCircle, label: "Chat" },
@@ -43,7 +45,7 @@ const navItems = [
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
   const { user, signOut, isAdmin } = useAuth();
-  const { currentPet, pets } = usePet();
+  const { currentPet, myPets } = usePet(); // CORRIGIDO: Usando myPets
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -100,7 +102,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {pets.map((pet) => (
+                  {myPets.map((pet) => ( // CORRIGIDO: Usando myPets
                     <DropdownMenuItem key={pet.id} asChild>
                       <Link to={`/pet/${pet.id}`} className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">

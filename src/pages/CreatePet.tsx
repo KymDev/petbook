@@ -38,7 +38,7 @@ const speciesOptions = [
 
 const CreatePet = () => {
   const { user } = useAuth();
-  const { refreshPets } = usePet();
+  const { refreshAll } = usePet(); // <-- CORREÇÃO: Usando refreshAll
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -143,7 +143,7 @@ const CreatePet = () => {
         description: `${form.name} agora faz parte do PetBook! 🎉`,
       });
 
-      await refreshPets();
+      await refreshAll(); // <-- CORREÇÃO: Chamando refreshAll
       navigate("/feed");
     } catch (error: any) {
       console.error("ERRO NO SUBMIT:", error);

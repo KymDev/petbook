@@ -121,11 +121,13 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Poppins', sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-semibold tracking-tight;
+    @apply font-semibold tracking-tight;
+    font-family: 'Poppins', sans-serif;
   }
 }
 
@@ -181,18 +183,164 @@
   }
 
   @keyframes slide-up {
-    from { 
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
   }
+}
+
+/* ================= ANIMAÇÕES DE LOADING ================= */
+
+/* Animação de cada pegada - aparece, fica visível, e some */
+@keyframes pawStep {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(10px);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8) translateY(-5px);
+  }
+}
+
+/* Classes para cada pegada com delay diferente */
+.paw-step-1 {
+  animation: pawStep 2.4s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.paw-step-2 {
+  animation: pawStep 2.4s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
+.paw-step-3 {
+  animation: pawStep 2.4s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+
+.paw-step-4 {
+  animation: pawStep 2.4s ease-in-out infinite;
+  animation-delay: 0.9s;
+}
+
+.paw-step-5 {
+  animation: pawStep 2.4s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
+.paw-step-6 {
+  animation: pawStep 2.4s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+/* Pegadas do fundo - aparecem suavemente */
+@keyframes bgPawFade {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+}
+
+/* Pegadas subindo do fundo - efeito de flutuar */
+@keyframes risingPaw {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.6);
+  }
+  20% {
+    opacity: 0.1;
+    transform: translateY(-20vh) scale(0.8);
+  }
+  80% {
+    opacity: 0.08;
+    transform: translateY(-80vh) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-110vh) scale(1);
+  }
+}
+
+.rising-paw {
+  bottom: -50px;
+  animation: risingPaw 10s linear infinite;
+}
+
+/* Glow suave de fundo */
+@keyframes glow {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.1); }
+}
+
+.animate-glow {
+  background: radial-gradient(circle at center, hsl(204, 100%, 70%, 0.15), transparent 70%);
+  animation: glow 6s ease-in-out infinite;
+}
+
+/* Progress bar */
+@keyframes progressFluid {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-progress-fluid {
+  animation: progressFluid 2.5s ease-in-out infinite;
+}
+
+/* Logo pop */
+@keyframes logoPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-logo-pop {
+  animation: logoPop 0.6s ease-out forwards;
+}
+
+/* Dots animation */
+@keyframes dotBounce {
+  0%, 80%, 100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.animate-dot-1 {
+  animation: dotBounce 1.4s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.animate-dot-2 {
+  animation: dotBounce 1.4s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+.animate-dot-3 {
+  animation: dotBounce 1.4s ease-in-out infinite;
+  animation-delay: 0.4s;
 }

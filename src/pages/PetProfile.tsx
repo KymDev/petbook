@@ -9,15 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Heart,
-  PawPrint,
-  Cookie,
-  ExternalLink,
-  UserPlus,
-  UserMinus,
-  MessageCircle,
-} from "lucide-react";
+import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle } from "lucide-react";
 
 interface Post {
   id: string;
@@ -32,6 +24,7 @@ const PetProfile = () => {
   const { id } = useParams<{ id: string }>();
   const { currentPet } = usePet();
   const { toast } = useToast();
+
   const [pet, setPet] = useState<Pet | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,86 +32,92 @@ const PetProfile = () => {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
+  // Fetch profile
   useEffect(() => {
-    if (id) {
-      fetchPetProfile();
-    }
+    if (id) fetchPetProfile();
   }, [id, currentPet]);
 
   const fetchPetProfile = async () => {
     setLoading(true);
 
-    // Fetch pet
+    // 1️⃣ Buscar pet
     const { data: petData } = await supabase
       .from("pets")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (petData) {
-      setPet(petData);
-
-      // Fetch posts
-      const { data: postsData } = await supabase
-        .from("posts")
-        .select("*")
-        .eq("pet_id", id)
-        .order("created_at", { ascending: false });
-
-      if (postsData) setPosts(postsData);
-
-      // Fetch follow status
-      if (currentPet && currentPet.id !== id) {
-        const { data: followData } = await supabase
-          .from("follows")
-          .select("id")
-          .eq("follower_pet_id", currentPet.id)
-          .eq("following_pet_id", id)
-          .maybeSingle();
-
-        setIsFollowing(!!followData);
-      }
-
-      // Fetch follow counts
-      const { count: followers } = await supabase
-        .from("follows")
-        .select("id", { count: "exact", head: true })
-        .eq("following_pet_id", id);
-
-      const { count: following } = await supabase
-        .from("follows")
-        .select("id", { count: "exact", head: true })
-        .eq("follower_pet_id", id);
-
-      setFollowersCount(followers || 0);
-      setFollowingCount(following || 0);
+    if (!petData) {
+      setPet(null);
+      setLoading(false);
+      return;
     }
+
+    setPet(petData);
+
+    // 2️⃣ Buscar posts
+    const { data: postsData } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("pet_id", id)
+      .order("created_at", { ascending: false });
+
+    if (postsData) setPosts(postsData);
+
+    // 3️⃣ Follow status
+    if (currentPet && currentPet.id !== id) {
+      const { data: followData } = await supabase
+        .from("followers")
+        .select("id")
+        .eq("follower_pet_id", currentPet.id)
+        .eq("target_pet_id", id)
+        .maybeSingle();
+
+      setIsFollowing(!!followData);
+    }
+
+    // 4️⃣ Contagem de seguidores e seguindo
+    const { count: followers } = await supabase
+      .from("followers")
+      .select("id", { count: "exact", head: true })
+      .eq("target_pet_id", id);
+
+    const { count: following } = await supabase
+      .from("followers")
+      .select("id", { count: "exact", head: true })
+      .eq("follower_pet_id", id);
+
+    setFollowersCount(followers || 0);
+    setFollowingCount(following || 0);
 
     setLoading(false);
   };
 
+  // Follow / unfollow
   const handleFollow = async () => {
     if (!currentPet || !pet) return;
 
     if (isFollowing) {
       await supabase
-        .from("follows")
+        .from("followers")
         .delete()
         .eq("follower_pet_id", currentPet.id)
-        .eq("following_pet_id", pet.id);
+        .eq("target_pet_id", pet.id);
 
       setIsFollowing(false);
       setFollowersCount((c) => c - 1);
     } else {
-      await supabase.from("follows").insert({
-        follower_pet_id: currentPet.id,
-        following_pet_id: pet.id,
-      });
+      await supabase
+        .from("followers")
+        .insert({
+          follower_pet_id: currentPet.id,
+          target_pet_id: pet.id,
+        });
 
       setIsFollowing(true);
       setFollowersCount((c) => c + 1);
 
-      // Create notification
+      // Cria notificação
       await supabase.from("notifications").insert({
         pet_id: pet.id,
         type: "follow",
@@ -128,6 +127,7 @@ const PetProfile = () => {
     }
   };
 
+  // Interações
   const handleInteraction = async (type: "abraco" | "patinha" | "petisco") => {
     if (!currentPet || !pet) return;
 
@@ -139,15 +139,12 @@ const PetProfile = () => {
 
     await supabase.from("notifications").insert({
       pet_id: pet.id,
-      type: type,
+      type,
       message: messages[type],
       related_pet_id: currentPet.id,
     });
 
-    toast({
-      title: "Enviado!",
-      description: messages[type],
-    });
+    toast({ title: "Enviado!", description: messages[type] });
   };
 
   if (loading) {
@@ -186,7 +183,7 @@ const PetProfile = () => {
   return (
     <MainLayout>
       <div className="container max-w-xl py-6 space-y-6">
-        {/* Profile Header */}
+        {/* Header */}
         <Card className="card-elevated border-0 overflow-hidden">
           <div className="h-24 gradient-bg" />
           <CardContent className="relative pt-0 pb-6">
@@ -242,37 +239,21 @@ const PetProfile = () => {
                   )}
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => handleInteraction("abraco")}
-                  className="gap-2"
-                >
-                  <Heart className="h-4 w-4 text-secondary" />
-                  Abraço
+                <Button variant="outline" onClick={() => handleInteraction("abraco")} className="gap-2">
+                  <Heart className="h-4 w-4 text-secondary" /> Abraço
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => handleInteraction("patinha")}
-                  className="gap-2"
-                >
-                  <PawPrint className="h-4 w-4 text-primary" />
-                  Patinha
+                <Button variant="outline" onClick={() => handleInteraction("patinha")} className="gap-2">
+                  <PawPrint className="h-4 w-4 text-primary" /> Patinha
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => handleInteraction("petisco")}
-                  className="gap-2"
-                >
-                  <Cookie className="h-4 w-4 text-amber-500" />
-                  Petisco
+                <Button variant="outline" onClick={() => handleInteraction("petisco")} className="gap-2">
+                  <Cookie className="h-4 w-4 text-amber-500" /> Petisco
                 </Button>
 
                 <Link to={`/chat/${pet.id}`}>
                   <Button variant="outline" className="gap-2">
-                    <MessageCircle className="h-4 w-4" />
-                    Chat
+                    <MessageCircle className="h-4 w-4" /> Chat
                   </Button>
                 </Link>
               </div>
@@ -283,14 +264,9 @@ const PetProfile = () => {
               <p className="text-sm text-muted-foreground mb-2">Guardião</p>
               <div className="flex items-center justify-between">
                 <span className="font-medium">{pet.guardian_name}</span>
-                <a
-                  href={pet.guardian_instagram_url || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <a href={pet.guardian_instagram_url || "#"} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" size="sm" className="gap-2">
-                    @{pet.guardian_instagram_username}
-                    <ExternalLink className="h-3 w-3" />
+                    @{pet.guardian_instagram_username} <ExternalLink className="h-3 w-3" />
                   </Button>
                 </a>
               </div>
