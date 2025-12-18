@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PetBookLogo } from "@/components/PetBookLogo";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePet } from "@/contexts/PetContext";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -11,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
@@ -18,7 +20,6 @@ import {
   Search,
   PlusCircle,
   MessageCircle,
-  Users,
   Bell,
   Settings,
   LogOut,
@@ -27,25 +28,35 @@ import {
   X,
   PawPrint,
   Sparkles,
+  Briefcase,
+  User as UserIcon,
+  Stethoscope,
+  Users,
+  CheckCircle,
 } from "lucide-react";
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
-const navItems = [
+// Itens principais do feed - sempre visíveis
+const primaryNavItems = [
   { href: "/feed", icon: Home, label: "Feed" },
-  { href: "/create-story", icon: Sparkles, label: "Story" },
   { href: "/explore", icon: Search, label: "Explorar" },
-  { href: "/create-post", icon: PlusCircle, label: "Postar" },
-  { href: "/chat", icon: MessageCircle, label: "Chat" },
-  { href: "/communities", icon: Users, label: "Comunidades" },
   { href: "/notifications", icon: Bell, label: "Notificações" },
+  { href: "/chat", icon: MessageCircle, label: "Chat" },
+  { href: "/services", icon: Stethoscope, label: "Serviços Pet" },
+];
+
+// Itens secundários - no menu dropdown
+const secondaryNavItems = [
+  { href: "/communities", icon: Users, label: "Comunidades" },
 ];
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
   const { user, signOut, isAdmin } = useAuth();
-  const { currentPet, myPets } = usePet(); // CORRIGIDO: Usando myPets
+  const { currentPet, myPets } = usePet();
+  const { profile } = useUserProfile();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,18 +66,27 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     navigate("/auth");
   };
 
+  const isProfessional = profile?.account_type === 'professional';
+
+  const handleSwitchAccount = async (type: 'user' | 'professional') => {
+    if (type === 'professional') {
+      navigate('/professional-profile');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Top Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border bg-card/80 backdrop-blur-lg">
-        <div className="container flex h-full items-center justify-between">
-          <Link to="/feed">
+      {/* Top Header - Mais limpo e organizado */}
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-border bg-card/95 backdrop-blur-lg">
+        <div className="container flex h-full items-center justify-between px-4">
+          {/* Logo */}
+          <Link to="/feed" className="flex-shrink-0">
             <PetBookLogo size="sm" />
           </Link>
 
-          {/* Desktop Nav */}
+          {/* Desktop Nav - Itens principais incluindo Serviços Pet */}
           <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
+            {primaryNavItems.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link key={item.href} to={item.href}>
@@ -86,23 +106,51 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          {/* Right Side Actions */}
+          <div className="flex items-center gap-2">
+            {/* Create Story/Post - Botão de ação rápida */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="hidden sm:flex">
+                  <PlusCircle className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link to="/create-post" className="flex items-center gap-2">
+                    <PlusCircle className="h-4 w-4" />
+                    Criar Post
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/create-story" className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Criar Story
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Pet Selector */}
             {currentPet && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2">
+                  <Button variant="ghost" size="sm" className="gap-2 hidden sm:flex">
                     <Avatar className="h-6 w-6">
                       <AvatarImage src={currentPet.avatar_url || undefined} />
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                         {currentPet.name[0]}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden sm:inline">{currentPet.name}</span>
+                    <span className="hidden md:inline max-w-[100px] truncate">
+                      {currentPet.name}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {myPets.map((pet) => ( // CORRIGIDO: Usando myPets
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Meus Pets</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {myPets.map((pet) => (
                     <DropdownMenuItem key={pet.id} asChild>
                       <Link to={`/pet/${pet.id}`} className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
@@ -124,14 +172,67 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               </DropdownMenu>
             )}
 
-            {/* User Menu */}
+            {/* Settings Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon">
                   <Settings className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-56">
+                {/* Alternar Tipo de Conta */}
+                <DropdownMenuLabel>Tipo de Conta</DropdownMenuLabel>
+                <DropdownMenuItem 
+                  onClick={() => handleSwitchAccount('user')}
+                  className={!isProfessional ? 'bg-primary/10' : ''}
+                >
+                  <UserIcon className="h-4 w-4 mr-2" />
+                  <span>Usuário (Guardião)</span>
+                  {!isProfessional && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleSwitchAccount('professional')}
+                  className={isProfessional ? 'bg-primary/10' : ''}
+                >
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  <span>Profissional</span>
+                  {isProfessional && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                
+                {/* Itens secundários de navegação */}
+                {secondaryNavItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link to={item.href} className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+                
+                <DropdownMenuSeparator />
+                
+                {/* Perfil Profissional */}
+                {isProfessional && (
+                  <>
+                    <DropdownMenuLabel>Área Profissional</DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link to="/professional-dashboard" className="flex items-center gap-2">
+                        <Stethoscope className="h-4 w-4" />
+                        Painel de Atendimento
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/professional-profile" className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Editar Perfil
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                
+                {/* Admin */}
                 {isAdmin && (
                   <>
                     <DropdownMenuItem asChild>
@@ -143,6 +244,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                     <DropdownMenuSeparator />
                   </>
                 )}
+                
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                   <LogOut className="h-4 w-4 mr-2" />
                   Sair
@@ -166,9 +268,13 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       {/* Mobile Nav */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 pt-16 md:hidden">
-          <div className="absolute inset-0 bg-background/95 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div 
+            className="absolute inset-0 bg-background/95 backdrop-blur-sm" 
+            onClick={() => setMobileMenuOpen(false)} 
+          />
           <nav className="relative bg-card border-b border-border p-4 space-y-2 animate-slide-up">
-            {navItems.map((item) => {
+            {/* Primary Items */}
+            {primaryNavItems.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -186,6 +292,44 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 </Link>
               );
             })}
+            
+            <div className="h-px bg-border my-2" />
+            
+            {/* Secondary Items */}
+            {secondaryNavItems.map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Button
+                    variant={isActive ? "default" : "ghost"}
+                    className={cn("w-full justify-start gap-3", isActive && "gradient-bg")}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.label}
+                  </Button>
+                </Link>
+              );
+            })}
+            
+            <div className="h-px bg-border my-2" />
+            
+            {/* Create Actions */}
+            <Link to="/create-post" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" className="w-full justify-start gap-3">
+                <PlusCircle className="h-5 w-5" />
+                Criar Post
+              </Button>
+            </Link>
+            <Link to="/create-story" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" className="w-full justify-start gap-3">
+                <Sparkles className="h-5 w-5" />
+                Criar Story
+              </Button>
+            </Link>
           </nav>
         </div>
       )}

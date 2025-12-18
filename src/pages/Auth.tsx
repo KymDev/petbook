@@ -68,7 +68,7 @@ const Auth = () => {
           toast({
             title: "Conta criada!",
             description:
-              "Verifique seu e-mail para confirmar sua conta antes de cadastrar seu pet.",
+              "Verifique seu e-mail para confirmar sua conta antes de continuar.",
           });
           navigate("/auth/confirm");
         }

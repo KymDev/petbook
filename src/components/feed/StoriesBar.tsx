@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePet } from "@/contexts/PetContext";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +26,7 @@ interface Story {
 
 export const StoriesBar = () => {
   const { currentPet } = usePet();
+  const { profile } = useUserProfile();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -39,19 +41,39 @@ export const StoriesBar = () => {
   const fetchStories = async () => {
     setLoading(true);
     
-    if (!currentPet) {
+    const isProfessional = profile?.account_type === 'professional';
+    
+    // Se não tem pet e não é profissional, não carrega stories
+    if (!currentPet && !isProfessional) {
       setLoading(false);
       return;
     }
 
-    // Get pets that currentPet follows
-    const { data: following } = await supabase
-      .from("followers")
-      .select("target_pet_id")
-      .eq("follower_pet_id", currentPet.id);
+    let visiblePetIds: string[] = [];
 
-    const followingPetIds = following?.map(f => f.target_pet_id) || [];
-    const visiblePetIds = [...followingPetIds, currentPet.id];
+    if (isProfessional) {
+      // Profissionais veem stories de todos os pets (comunidade)
+      // Buscamos os 100 pets mais recentes que postaram stories
+      const { data: recentStoryPets } = await supabase
+        .from("stories")
+        .select("pet_id")
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(100);
+      
+      // Remove duplicatas e usa os IDs
+      const petIdsWithStories = recentStoryPets?.map(s => s.pet_id) || [];
+      visiblePetIds = Array.from(new Set(petIdsWithStories));
+    } else if (currentPet) {
+      // Usuários comuns veem apenas de quem seguem
+      const { data: following } = await supabase
+        .from("followers")
+        .select("target_pet_id")
+        .eq("follower_pet_id", currentPet.id);
+
+      const followingPetIds = following?.map(f => f.target_pet_id) || [];
+      visiblePetIds = [...followingPetIds, currentPet.id];
+    }
 
     // Get non-expired stories from followed pets
     const { data: storiesData } = await supabase
@@ -63,14 +85,18 @@ export const StoriesBar = () => {
       .limit(20);
 
     if (storiesData) {
-      // Check which stories current pet has viewed
-      const { data: viewsData } = await supabase
-        .from("story_views")
-        .select("story_id")
-        .eq("viewer_pet_id", currentPet.id)
-        .in("story_id", storiesData.map(s => s.id));
+      // Check which stories current pet has viewed (se tiver pet)
+      let viewedStoryIds = new Set<string>();
+      
+      if (currentPet) {
+        const { data: viewsData } = await supabase
+          .from("story_views")
+          .select("story_id")
+          .eq("viewer_pet_id", currentPet.id)
+          .in("story_id", storiesData.map(s => s.id));
 
-      const viewedStoryIds = new Set(viewsData?.map(v => v.story_id) || []);
+        viewedStoryIds = new Set(viewsData?.map(v => v.story_id) || []);
+      }
 
       const storiesWithViews = storiesData.map(story => ({
         ...story,

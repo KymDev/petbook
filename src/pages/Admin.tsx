@@ -6,6 +6,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminServiceLink from "@/components/Admin/AdminServiceLink";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Users, PawPrint, FileText, Trash2 } from "lucide-react";
 
@@ -58,7 +59,8 @@ const Admin = () => {
           <h1 className="text-2xl font-heading font-bold">Painel Admin</h1>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+	        <div className="grid grid-cols-3 gap-4">
+              <AdminServiceLink />
           <Card className="card-elevated border-0">
             <CardContent className="p-4 text-center">
               <Users className="h-8 w-8 mx-auto mb-2 text-primary" />

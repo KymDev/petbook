@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePet, Pet } from "@/contexts/PetContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUserProfile } from "@/contexts/UserProfileContext";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PostCard } from "@/components/feed/PostCard";
 import { Button } from "@/components/ui/button";
@@ -9,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle } from "lucide-react";
+import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle, Stethoscope } from "lucide-react";
 
 interface Post {
   id: string;
@@ -21,9 +23,14 @@ interface Post {
 }
 
 const PetProfile = () => {
-  const { id } = useParams<{ id: string }>();
-  const { currentPet } = usePet();
+  const { petId } = useParams<{ petId: string }>(); // Alterado de id para petId para consistência
+  const { user } = useAuth();
+  const { currentPet, followPet, unfollowPet, isProfessionalFollowing } = usePet();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const isProfessional = profile?.account_type === 'professional';
 
   const [pet, setPet] = useState<Pet | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -34,8 +41,8 @@ const PetProfile = () => {
 
   // Fetch profile
   useEffect(() => {
-    if (id) fetchPetProfile();
-  }, [id, currentPet]);
+    if (petId) fetchPetProfile();
+  }, [petId, currentPet, isProfessional]);
 
   const fetchPetProfile = async () => {
     setLoading(true);
@@ -44,7 +51,7 @@ const PetProfile = () => {
     const { data: petData } = await supabase
       .from("pets")
       .select("*")
-      .eq("id", id)
+      .eq("id", petId)
       .single();
 
     if (!petData) {
@@ -59,33 +66,43 @@ const PetProfile = () => {
     const { data: postsData } = await supabase
       .from("posts")
       .select("*")
-      .eq("pet_id", id)
+      .eq("pet_id", petId)
       .order("created_at", { ascending: false });
 
     if (postsData) setPosts(postsData);
 
     // 3️⃣ Follow status
-    if (currentPet && currentPet.id !== id) {
-      const { data: followData } = await supabase
-        .from("followers")
-        .select("id")
-        .eq("follower_pet_id", currentPet.id)
-        .eq("target_pet_id", id)
-        .maybeSingle();
+    if (petId) {
+      if (isProfessional && user) {
+        // Profissional seguindo
+        const isProfFollowing = await isProfessionalFollowing(petId);
+        setIsFollowing(isProfFollowing);
+      } else if (currentPet && currentPet.id !== petId) {
+        // Pet seguindo
+        const { data: followData } = await supabase
+          .from("followers")
+          .select("id")
+          .eq("follower_id", currentPet.id) // Alterado para follower_id
+          .eq("is_user_follower", false) // Adicionado filtro
+          .eq("target_pet_id", petId)
+          .maybeSingle();
 
-      setIsFollowing(!!followData);
+        setIsFollowing(!!followData);
+      }
     }
 
     // 4️⃣ Contagem de seguidores e seguindo
     const { count: followers } = await supabase
       .from("followers")
       .select("id", { count: "exact", head: true })
-      .eq("target_pet_id", id);
+      .eq("target_pet_id", petId);
 
+    // Contagem de quem o pet segue (apenas pets)
     const { count: following } = await supabase
       .from("followers")
       .select("id", { count: "exact", head: true })
-      .eq("follower_pet_id", id);
+      .eq("follower_id", petId)
+      .eq("is_user_follower", false);
 
     setFollowersCount(followers || 0);
     setFollowingCount(following || 0);
@@ -95,34 +112,35 @@ const PetProfile = () => {
 
   // Follow / unfollow
   const handleFollow = async () => {
-    if (!currentPet || !pet) return;
+    if (!pet) return;
+    if (!currentPet && !isProfessional) return; // Precisa ser pet ou profissional para seguir
 
-    if (isFollowing) {
-      await supabase
-        .from("followers")
-        .delete()
-        .eq("follower_pet_id", currentPet.id)
-        .eq("target_pet_id", pet.id);
+    try {
+      if (isFollowing) {
+        await unfollowPet(pet.id);
+      } else {
+        await followPet(pet.id);
+      }
 
-      setIsFollowing(false);
-      setFollowersCount((c) => c - 1);
-    } else {
-      await supabase
-        .from("followers")
-        .insert({
-          follower_pet_id: currentPet.id,
-          target_pet_id: pet.id,
+      // Atualiza o estado local para feedback imediato
+      setIsFollowing(!isFollowing);
+      setFollowersCount((c) => (isFollowing ? c - 1 : c + 1));
+
+      // Cria notificação (apenas se for um pet seguindo)
+      if (currentPet && !isProfessional && !isFollowing) { // Apenas se for pet e não profissional
+        await supabase.from("notifications").insert({
+          pet_id: pet.id,
+          type: "follow",
+          message: `${currentPet.name} começou a seguir você!`,
+          related_pet_id: currentPet.id,
         });
-
-      setIsFollowing(true);
-      setFollowersCount((c) => c + 1);
-
-      // Cria notificação
-      await supabase.from("notifications").insert({
-        pet_id: pet.id,
-        type: "follow",
-        message: `${currentPet.name} começou a seguir você!`,
-        related_pet_id: currentPet.id,
+      }
+    } catch (error) {
+      console.error("Erro ao seguir/deixar de seguir:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível completar a ação. Tente novamente.",
+        variant: "destructive",
       });
     }
   };
@@ -219,45 +237,60 @@ const PetProfile = () => {
             </div>
 
             {/* Actions */}
-            {!isOwnPet && currentPet && (
-              <div className="flex flex-wrap justify-center gap-2 mt-4">
-                <Button
-                  onClick={handleFollow}
-                  variant={isFollowing ? "outline" : "default"}
-                  className={!isFollowing ? "gradient-bg" : ""}
-                >
-                  {isFollowing ? (
+            <div className="flex flex-wrap justify-center gap-2 mt-4">
+              {isOwnPet ? (
+                // Ações para o próprio pet
+                <Button onClick={() => navigate(`/pets/${petId}/saude`)} className="gap-2">
+                  <Stethoscope className="h-4 w-4" />
+                  Registros de Saúde
+                </Button>
+              ) : (
+                // Ações para outros pets
+                <>
+                  {(currentPet || isProfessional) && (
+                    <Button
+                      onClick={handleFollow}
+                      variant={isFollowing ? "outline" : "default"}
+                      className={!isFollowing ? "gradient-bg" : ""}
+                    >
+                      {isFollowing ? (
+                        <>
+                          <UserMinus className="h-4 w-4 mr-2" />
+                          Deixar de seguir
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Seguir
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {currentPet && ( // Interações apenas para Guardiões
                     <>
-                      <UserMinus className="h-4 w-4 mr-2" />
-                      Deixar de seguir
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4 mr-2" />
-                      Seguir
+                      <Button variant="outline" onClick={() => handleInteraction("abraco")} className="gap-2">
+                        <Heart className="h-4 w-4 text-secondary" /> Abraço
+                      </Button>
+
+                      <Button variant="outline" onClick={() => handleInteraction("patinha")} className="gap-2">
+                        <PawPrint className="h-4 w-4 text-primary" /> Patinha
+                      </Button>
+
+                      <Button variant="outline" onClick={() => handleInteraction("petisco")} className="gap-2">
+                        <Cookie className="h-4 w-4 text-amber-500" /> Petisco
+                      </Button>
                     </>
                   )}
-                </Button>
 
-                <Button variant="outline" onClick={() => handleInteraction("abraco")} className="gap-2">
-                  <Heart className="h-4 w-4 text-secondary" /> Abraço
-                </Button>
-
-                <Button variant="outline" onClick={() => handleInteraction("patinha")} className="gap-2">
-                  <PawPrint className="h-4 w-4 text-primary" /> Patinha
-                </Button>
-
-                <Button variant="outline" onClick={() => handleInteraction("petisco")} className="gap-2">
-                  <Cookie className="h-4 w-4 text-amber-500" /> Petisco
-                </Button>
-
-                <Link to={`/chat/${pet.id}`}>
-                  <Button variant="outline" className="gap-2">
-                    <MessageCircle className="h-4 w-4" /> Chat
-                  </Button>
-                </Link>
-              </div>
-            )}
+                  <Link to={`/chat/${pet.id}`}>
+                    <Button variant="outline" className="gap-2">
+                      <MessageCircle className="h-4 w-4" /> Chat
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
 
             {/* Guardian Info */}
             <div className="mt-6 p-4 rounded-lg bg-muted/50">

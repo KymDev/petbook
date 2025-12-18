@@ -236,36 +236,76 @@ export type Database = {
           },
         ]
       }
-      follows: {
+       health_records: {
+        Row: {
+          attachment_url: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          pet_id: string
+          record_date: string
+          record_type: Database["public"]["Enums"]["health_record_type"]
+          title: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pet_id: string
+          record_date: string
+          record_type: Database["public"]["Enums"]["health_record_type"]
+          title: string
+        }
+        Update: {
+          attachment_url?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          pet_id?: string
+          record_date?: string
+          record_type?: Database["public"]["Enums"]["health_record_type"]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_records_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follows: {{
         Row: {
           created_at: string
           follower_pet_id: string
-          following_pet_id: string
+          target_pet_id: string
           id: string
         }
         Insert: {
           created_at?: string
-          follower_pet_id: string
-          following_pet_id: string
-          id?: string
-        }
+          follower_pet_id?: string
+          target_pet_id?: string
+          id?: string       }
         Update: {
           created_at?: string
           follower_pet_id?: string
-          following_pet_id?: string
+          target_pet_id?: string
           id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "follows_follower_pet_id_fkey"
+            foreignKeyName: "followers_follower_pet_id_fkey"
             columns: ["follower_pet_id"]
             isOneToOne: false
             referencedRelation: "pets"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "follows_following_pet_id_fkey"
-            columns: ["following_pet_id"]
+            foreignKeyName: "followers_target_pet_id_fkey"
+            columns: ["target_pet_id"]
             isOneToOne: false
             referencedRelation: "pets"
             referencedColumns: ["id"]
@@ -634,6 +674,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      health_record_type: [
+        "vaccine",
+        "vet_visit",
+        "medication",
+        "diet",
+        "grooming",
+        "other",
+      ],
       friendship_status: ["pending", "accepted"],
       post_type: ["text", "photo", "video"],
       reaction_type: [

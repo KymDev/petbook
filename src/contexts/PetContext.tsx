@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
+import { useUserProfile } from "./UserProfileContext";
 
 export interface Pet {
   id: string;
@@ -28,6 +29,7 @@ interface PetContextType {
   followPet: (id: string) => Promise<void>;
   unfollowPet: (id: string) => Promise<void>;
   searchPets: (query: string) => Pet[];
+  isProfessionalFollowing: (targetPetId: string) => Promise<boolean>; // NOVO
 }
 
 const PetContext = createContext<PetContextType | undefined>(undefined);
@@ -70,11 +72,28 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
     setAllPets(data || []);
   };
 
+  // Função para verificar se o profissional segue um pet
+  const isProfessionalFollowing = async (targetPetId: string): Promise<boolean> => {
+    if (!user) return false;
+
+    const { data } = await supabase
+      .from("followers")
+      .select("id")
+      .eq("follower_id", user.id)
+      .eq("target_pet_id", targetPetId)
+      .eq("is_user_follower", true)
+      .single();
+
+    return !!data;
+  };
+
   const loadFollowing = async (petId: string) => {
+    // Carrega pets seguidos por um pet
     const { data: rows } = await supabase
       .from("followers")
       .select("target_pet_id")
-      .eq("follower_pet_id", petId);
+      .eq("follower_id", petId)
+      .eq("is_user_follower", false);
 
     if (!rows?.length) {
       setFollowing([]);
@@ -92,26 +111,47 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const followPet = async (targetPetId: string) => {
-    if (!currentPet) return;
+    if (!user) return; // Precisa de um usuário logado
+
+    // Profissionais seguem como user_id, Guardiões seguem como pet_id
+    const followerId = currentPet ? currentPet.id : user.id;
+    const isProfessional = !currentPet; // Se não tem currentPet, é profissional
 
     await supabase.from("followers").insert({
-      follower_pet_id: currentPet.id,
+      follower_id: followerId, // ID do pet ou do usuário
       target_pet_id: targetPetId,
+      is_user_follower: isProfessional, // Indica se quem segue é um usuário (profissional)
     });
 
-    await loadFollowing(currentPet.id);
+    // Se for pet, carrega os pets seguidos. Se for profissional, não precisa carregar pets seguidos.
+    if (currentPet) {
+      await loadFollowing(currentPet.id);
+    }
   };
 
   const unfollowPet = async (targetPetId: string) => {
-    if (!currentPet) return;
+    if (!user) return; // Precisa de um usuário logado
 
-    await supabase
+    const followerId = currentPet ? currentPet.id : user.id;
+    const isProfessional = !currentPet;
+
+    let query = supabase
       .from("followers")
       .delete()
-      .eq("follower_pet_id", currentPet.id)
-      .eq("target_pet_id", targetPetId);
+      .eq("target_pet_id", targetPetId)
+      .eq("follower_id", followerId);
 
-    await loadFollowing(currentPet.id);
+    if (isProfessional) {
+      query = query.eq("is_user_follower", true);
+    } else {
+      query = query.eq("is_user_follower", false);
+    }
+
+    await query;
+
+    if (currentPet) {
+      await loadFollowing(currentPet.id);
+    }
   };
 
   const searchPets = (query: string) => {
@@ -130,18 +170,21 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   };
 
-useEffect(() => {
-  if (user === undefined) return; // ainda carregando auth
+  const { profile, loading: profileLoading } = useUserProfile();
 
-  if (!user) {
-    setMyPets([]);
-    setCurrentPet(null);
-    setLoading(false);
-    return;
-  }
+  useEffect(() => {
+    if (user === undefined || profileLoading) return; // Espera o Auth e o Profile carregarem
 
-  refreshAll();
-}, [user]);
+    if (!user) {
+      setMyPets([]);
+      setCurrentPet(null);
+      setLoading(false);
+      return;
+    }
+
+    // Se o usuário está logado e o perfil carregou, carrega os pets
+    refreshAll();
+  }, [user, profileLoading]);
 
 
   useEffect(() => {
@@ -165,6 +208,7 @@ useEffect(() => {
         followPet,
         unfollowPet,
         searchPets,
+        isProfessionalFollowing, // NOVO
       }}
     >
       {children}
