@@ -236,36 +236,37 @@ export type Database = {
           },
         ]
       }
+      follows: {{
        health_records: {
         Row: {
           attachment_url: string | null
           created_at: string
           id: string
-          notes: string | null
+          professional_name: string | null
+          observation: string | null
           pet_id: string
           record_date: string
           record_type: Database["public"]["Enums"]["health_record_type"]
-          title: string
         }
         Insert: {
           attachment_url?: string | null
           created_at?: string
           id?: string
-          notes?: string | null
+          professional_name?: string | null
+          observation?: string | null
           pet_id: string
           record_date: string
           record_type: Database["public"]["Enums"]["health_record_type"]
-          title: string
         }
         Update: {
           attachment_url?: string | null
           created_at?: string
           id?: string
-          notes?: string | null
+          professional_name?: string | null
+          observation?: string | null
           pet_id?: string
           record_date?: string
           record_type?: Database["public"]["Enums"]["health_record_type"]
-          title?: string
         }
         Relationships: [
           {
@@ -277,7 +278,6 @@ export type Database = {
           },
         ]
       }
-      follows: {{
         Row: {
           created_at: string
           follower_pet_id: string
@@ -412,6 +412,35 @@ export type Database = {
         }
         Relationships: []
       }
+      pet_badges: {
+        Row: {
+          awarded_at: string
+          badge_type: Database["public"]["Enums"]["badge_type"]
+          id: string
+          pet_id: string
+        }
+        Insert: {
+          awarded_at?: string
+          badge_type: Database["public"]["Enums"]["badge_type"]
+          id?: string
+          pet_id: string
+        }
+        Update: {
+          awarded_at?: string
+          badge_type?: Database["public"]["Enums"]["badge_type"]
+          id?: string
+          pet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pet_badges_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           created_at: string
@@ -447,25 +476,55 @@ export type Database = {
           },
         ]
       }
+      reactions: {
       profiles: {
         Row: {
+          account_type: Database["public"]["Enums"]["account_type"]
           created_at: string
           email: string
           id: string
+          is_professional_verified: boolean
+          professional_address: string | null
+          professional_city: string | null
+          professional_phone: string | null
+          professional_service_type: Database["public"]["Enums"]["service_type"] | null
+          professional_specialties: string[] | null
+          professional_state: string | null
+          updated_at: string
+          professional_whatsapp: string | null
         }
         Insert: {
+          account_type?: Database["public"]["Enums"]["account_type"]
           created_at?: string
           email: string
           id: string
+          is_professional_verified?: boolean
+          professional_address?: string | null
+          professional_city?: string | null
+          professional_phone?: string | null
+          professional_service_type?: Database["public"]["Enums"]["service_type"] | null
+          professional_specialties?: string[] | null
+          professional_state?: string | null
+          updated_at?: string
+          professional_whatsapp?: string | null
         }
         Update: {
+          account_type?: Database["public"]["Enums"]["account_type"]
           created_at?: string
           email?: string
           id?: string
+          is_professional_verified?: boolean
+          professional_address?: string | null
+          professional_city?: string | null
+          professional_phone?: string | null
+          professional_service_type?: Database["public"]["Enums"]["service_type"] | null
+          professional_specialties?: string[] | null
+          professional_state?: string | null
+          updated_at?: string
+          professional_whatsapp?: string | null
         }
         Relationships: []
       }
-      reactions: {
         Row: {
           created_at: string
           id: string
@@ -546,6 +605,10 @@ export type Database = {
         | "miado"
         | "latido"
         | "fofura"
+      badge_type:
+        | "primeiro_dia"
+        | "pet_ativo"
+        | "pet_em_destaque"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -674,15 +737,13 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      health_record_type: [
-        "vaccine",
-        "vet_visit",
-        "medication",
-        "diet",
-        "grooming",
-        "other",
-      ],
       friendship_status: ["pending", "accepted"],
+      health_record_type: [
+        "vacina",
+        "consulta",
+        "exame",
+        "check_up",
+      ],
       post_type: ["text", "photo", "video"],
       reaction_type: [
         "patinha",

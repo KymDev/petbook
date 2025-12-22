@@ -29,6 +29,7 @@ import CreateStory from "./pages/CreateStory";
 import SignupChoice from "./pages/SignupChoice";
 import ProfessionalSignup from "./pages/ProfessionalSignup";
 import ProfessionalDashboard from "./pages/ProfessionalDashboard";
+import EditPet from "./pages/EditPet"; // Importar o novo componente
 
 // NOVO: Importação do componente de Registros de Saúde
 import HealthRecordsPage from "./components/HealthRecords/HealthRecordsPage";
@@ -226,14 +227,24 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-    <Route
-      path="/pet/:petId" // Alterado de /pet/:id para /pet/:petId para consistência com o novo HealthRecordsWrapper
-      element={
-        <ProtectedRoute>
-          <PetProfile />
-        </ProtectedRoute>
-      }
-    />
+	    <Route
+	      path="/pet/:petId" // Alterado de /pet/:id para /pet/:petId para consistência com o novo HealthRecordsWrapper
+	      element={
+	        <ProtectedRoute>
+	          <PetProfile />
+	        </ProtectedRoute>
+	      }
+	    />
+	    
+	    {/* NOVA ROTA: Edição de Pet */}
+	    <Route
+	      path="/edit-pet/:petId"
+	      element={
+	        <ProtectedRoute>
+	          <EditPet />
+	        </ProtectedRoute>
+	      }
+	    />
     
     {/* NOVA ROTA: Registros de Saúde */}
     <Route

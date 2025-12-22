@@ -1,16 +1,16 @@
 -- Migration: Add health_records table for pet health and well-being tracking
 
 -- 1. Create enum for health record types
-CREATE TYPE public.health_record_type AS ENUM ('vaccine', 'vet_visit', 'medication', 'diet', 'grooming', 'other');
+CREATE TYPE public.health_record_type AS ENUM ('vacina', 'consulta', 'exame', 'check_up');
 
 -- 2. Create health_records table
 CREATE TABLE public.health_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   pet_id UUID REFERENCES public.pets(id) ON DELETE CASCADE NOT NULL,
   record_type health_record_type NOT NULL,
-  title TEXT NOT NULL, -- Adicionando um título para melhor organização
-  record_date TIMESTAMP WITH TIME ZONE NOT NULL,
-  notes TEXT,
+  professional_name TEXT, -- Nome do profissional responsável (quando houver)
+  record_date DATE NOT NULL,
+  observation TEXT,
   attachment_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );

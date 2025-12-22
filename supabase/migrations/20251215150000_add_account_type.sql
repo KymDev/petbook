@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   professional_bio TEXT,
   professional_specialties TEXT[],
   professional_phone TEXT,
+  professional_whatsapp TEXT,
   professional_address TEXT,
   professional_service_type service_type,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,

@@ -1,4 +1,6 @@
 import { useNavigate } from "react-router-dom";
+import { useUserProfile } from "@/contexts/UserProfileContext";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PetBookLogo } from "@/components/PetBookLogo";
@@ -6,14 +8,31 @@ import { User, Briefcase, ArrowRight, Heart, Store } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SignupChoice() {
+  const { switchAccountType, refreshProfile } = useUserProfile();
   const navigate = useNavigate();
 
-  const handleNormalSignup = () => {
-    navigate("/create-pet");
+  const handleNormalSignup = async () => {
+    try {
+      await switchAccountType("user");
+      await refreshProfile();
+      navigate("/create-pet");
+    } catch (error) {
+      toast.error("Erro ao definir tipo de conta", {
+        description: "Tente novamente mais tarde.",
+      });
+    }
   };
 
-  const handleProfessionalSignup = () => {
-    navigate("/professional-signup");
+  const handleProfessionalSignup = async () => {
+    try {
+      await switchAccountType("professional");
+      await refreshProfile();
+      navigate("/professional-signup");
+    } catch (error) {
+      toast.error("Erro ao definir tipo de conta", {
+        description: "Tente novamente mais tarde.",
+      });
+    }
   };
 
   return (

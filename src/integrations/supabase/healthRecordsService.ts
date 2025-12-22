@@ -3,6 +3,7 @@ import { Database } from './types';
 
 // Tipos auxiliares para facilitar o uso
 type HealthRecord = Database['public']['Tables']['health_records']['Row'];
+type HealthRecordType = Database['public']['Enums']['health_record_type'];
 type HealthRecordInsert = Database['public']['Tables']['health_records']['Insert'];
 type HealthRecordUpdate = Database['public']['Tables']['health_records']['Update'];
 
@@ -14,7 +15,7 @@ type HealthRecordUpdate = Database['public']['Tables']['health_records']['Update
 export async function getHealthRecords(petId: string): Promise<{ data: HealthRecord[] | null; error: any }> {
   const { data, error } = await supabase
     .from('health_records')
-    .select('*')
+    .select('*, pet:pet_id(name)')
     .eq('pet_id', petId)
     .order('record_date', { ascending: false });
 

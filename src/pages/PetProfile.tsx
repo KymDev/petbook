@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+// PetBook/src/pages/PetProfile.tsx
+
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePet, Pet } from "@/contexts/PetContext";
@@ -8,6 +10,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { PostCard } from "@/components/feed/PostCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { BadgeDisplay } from "@/components/pet/BadgeDisplay";
+import { getPetBadges } from "@/integrations/supabase/badgeService";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +27,7 @@ interface Post {
 }
 
 const PetProfile = () => {
-  const { petId } = useParams<{ petId: string }>(); // Alterado de id para petId para consistência
+  const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
   const { currentPet, followPet, unfollowPet, isProfessionalFollowing } = usePet();
   const { profile } = useUserProfile();
@@ -33,6 +37,8 @@ const PetProfile = () => {
   const isProfessional = profile?.account_type === 'professional';
 
   const [pet, setPet] = useState<Pet | null>(null);
+  const [guardianProfile, setGuardianProfile] = useState<{ full_name: string, professional_whatsapp: string | null } | null>(null);
+  const [badges, setBadges] = useState<any[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
@@ -50,9 +56,15 @@ const PetProfile = () => {
     // 1️⃣ Buscar pet
     const { data: petData } = await supabase
       .from("pets")
-      .select("*")
+      .select("*") // Apenas o pet
       .eq("id", petId)
       .single();
+
+    // 1.5️⃣ Buscar selos
+    const { data: badgesData } = await getPetBadges(petId);
+    if (badgesData) {
+      setBadges(badgesData);
+    }
 
     if (!petData) {
       setPet(null);
@@ -60,7 +72,23 @@ const PetProfile = () => {
       return;
     }
 
-    setPet(petData);
+    // Extrair o perfil do guardião e o pet
+    const petInfo = petData;
+    setPet(petInfo as Pet);
+
+    // 2️⃣ Buscar perfil do guardião separadamente
+    const { data: profileData, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("full_name, professional_whatsapp")
+      .eq("id", petData.user_id) // Usa o user_id do pet
+      .single();
+
+    if (profileError) {
+      console.error("Erro ao buscar perfil do guardião:", profileError);
+      setGuardianProfile(null); // Define como null para evitar falha
+    } else {
+      setGuardianProfile(profileData as { full_name: string, professional_whatsapp: string | null });
+    }
 
     // 2️⃣ Buscar posts
     const { data: postsData } = await supabase
@@ -82,8 +110,8 @@ const PetProfile = () => {
         const { data: followData } = await supabase
           .from("followers")
           .select("id")
-          .eq("follower_id", currentPet.id) // Alterado para follower_id
-          .eq("is_user_follower", false) // Adicionado filtro
+          .eq("follower_id", currentPet.id)
+          .eq("is_user_follower", false)
           .eq("target_pet_id", petId)
           .maybeSingle();
 
@@ -113,7 +141,7 @@ const PetProfile = () => {
   // Follow / unfollow
   const handleFollow = async () => {
     if (!pet) return;
-    if (!currentPet && !isProfessional) return; // Precisa ser pet ou profissional para seguir
+    if (!currentPet && !isProfessional) return;
 
     try {
       if (isFollowing) {
@@ -126,14 +154,25 @@ const PetProfile = () => {
       setIsFollowing(!isFollowing);
       setFollowersCount((c) => (isFollowing ? c - 1 : c + 1));
 
-      // Cria notificação (apenas se for um pet seguindo)
-      if (currentPet && !isProfessional && !isFollowing) { // Apenas se for pet e não profissional
-        await supabase.from("notifications").insert({
-          pet_id: pet.id,
-          type: "follow",
-          message: `${currentPet.name} começou a seguir você!`,
-          related_pet_id: currentPet.id,
-        });
+      // Cria notificação
+      if (!isFollowing) { // Apenas se estiver seguindo
+        if (currentPet && !isProfessional) { // Pet seguindo Pet
+          await supabase.from("notifications").insert({
+            pet_id: pet.id,
+            type: "follow",
+            message: `${currentPet.name} começou a seguir você!`,
+            related_pet_id: currentPet.id,
+            is_read: false,
+          });
+        } else if (isProfessional && user) { // Profissional seguindo Pet
+          await supabase.from("notifications").insert({
+            pet_id: pet.id,
+            type: "follow",
+            message: `${profile?.full_name || "Um Profissional de Serviço"} começou a seguir você!`,
+            related_user_id: user.id, // Usar related_user_id para profissional
+            is_read: false,
+          });
+        }
       }
     } catch (error) {
       console.error("Erro ao seguir/deixar de seguir:", error);
@@ -160,6 +199,7 @@ const PetProfile = () => {
       type,
       message: messages[type],
       related_pet_id: currentPet.id,
+      is_read: false,
     });
 
     toast({ title: "Enviado!", description: messages[type] });
@@ -214,6 +254,11 @@ const PetProfile = () => {
 
             <div className="text-center mt-4 space-y-2">
               <h1 className="text-2xl font-heading font-bold">{pet.name}</h1>
+              <div className="flex flex-wrap justify-center gap-2 mt-2">
+                {badges.map((badge) => (
+                  <BadgeDisplay key={badge.id} badgeType={badge.badge_type} />
+                ))}
+              </div>
               <p className="text-muted-foreground">
                 {pet.species} • {pet.breed} • {pet.age} anos
               </p>
@@ -239,58 +284,95 @@ const PetProfile = () => {
             {/* Actions */}
             <div className="flex flex-wrap justify-center gap-2 mt-4">
               {isOwnPet ? (
-                // Ações para o próprio pet
-                <Button onClick={() => navigate(`/pets/${petId}/saude`)} className="gap-2">
-                  <Stethoscope className="h-4 w-4" />
-                  Registros de Saúde
-                </Button>
-              ) : (
-                // Ações para outros pets
-                <>
-                  {(currentPet || isProfessional) && (
-                    <Button
-                      onClick={handleFollow}
-                      variant={isFollowing ? "outline" : "default"}
-                      className={!isFollowing ? "gradient-bg" : ""}
-                    >
-                      {isFollowing ? (
-                        <>
-                          <UserMinus className="h-4 w-4 mr-2" />
-                          Deixar de seguir
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Seguir
-                        </>
-                      )}
-                    </Button>
-                  )}
-
-                  {currentPet && ( // Interações apenas para Guardiões
-                    <>
-                      <Button variant="outline" onClick={() => handleInteraction("abraco")} className="gap-2">
-                        <Heart className="h-4 w-4 text-secondary" /> Abraço
-                      </Button>
-
-                      <Button variant="outline" onClick={() => handleInteraction("patinha")} className="gap-2">
-                        <PawPrint className="h-4 w-4 text-primary" /> Patinha
-                      </Button>
-
-                      <Button variant="outline" onClick={() => handleInteraction("petisco")} className="gap-2">
-                        <Cookie className="h-4 w-4 text-amber-500" /> Petisco
-                      </Button>
-                    </>
-                  )}
-
-                  <Link to={`/chat/${pet.id}`}>
-                    <Button variant="outline" className="gap-2">
-                      <MessageCircle className="h-4 w-4" /> Chat
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
+		                // Ações para o próprio pet
+		                <>
+		                  <Button onClick={() => navigate(`/pets/${petId}/saude`)} className="gap-2">
+		                    <Stethoscope className="h-4 w-4" />
+		                    Registros de Saúde
+		                  </Button>
+		                  <Button onClick={() => navigate(`/edit-pet/${petId}`)} variant="outline" className="gap-2">
+		                    <ExternalLink className="h-4 w-4" />
+		                    Editar Perfil
+		                  </Button>
+		                </>
+	              ) : (
+	                // Ações para outros pets
+	                <>
+	                  {(currentPet || isProfessional) && (
+	                    <Button
+	                      onClick={handleFollow}
+	                      variant={isFollowing ? "outline" : "default"}
+	                      className={!isFollowing ? "gradient-bg" : ""}
+	                    >
+	                      {isFollowing ? (
+	                        <>
+	                          <UserMinus className="h-4 w-4 mr-2" />
+	                          Deixar de seguir
+	                        </>
+	                      ) : (
+	                        <>
+	                          <UserPlus className="h-4 w-4 mr-2" />
+	                          Seguir
+	                        </>
+	                      )}
+	                    </Button>
+	                  )}
+	
+		                  {currentPet && ( // Interações apenas para Guardiões
+		                    <>
+		                      <Button variant="outline" onClick={() => handleInteraction("abraco")} className="gap-2">
+		                        <Heart className="h-4 w-4 text-secondary" /> Abraço
+		                      </Button>
+		
+		                      <Button variant="outline" onClick={() => handleInteraction("patinha")} className="gap-2">
+		                        <PawPrint className="h-4 w-4 text-primary" /> Patinha
+		                      </Button>
+		
+		                      <Button variant="outline" onClick={() => handleInteraction("petisco")} className="gap-2">
+		                        <Cookie className="h-4 w-4 text-amber-500" /> Petisco
+		                      </Button>
+		                    </>
+		                  )}
+		
+		                  {/* Botão de Chat */}
+		                  {currentPet && (
+		                    <Link to={`/chat/${pet.id}`}>
+		                      <Button variant="outline" className="gap-2">
+		                        <MessageCircle className="h-4 w-4" /> Chat
+		                      </Button>
+		                    </Link>
+		                  )}
+		
+		                  {/* Botão de WhatsApp - Apenas para Profissionais */}
+		                  {isProfessional && guardianProfile?.professional_whatsapp && (
+		                    <a 
+		                      href={`https://wa.me/${guardianProfile.professional_whatsapp.replace(/\D/g, '' )}`} 
+		                      target="_blank" 
+		                      rel="noopener noreferrer"
+		                    >
+		                      <Button className="bg-green-500 hover:bg-green-600 text-white gap-2">
+		                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 2C6.477 2 2 6.477 2 12c0 3.189 1.303 6.06 3.414 8.172L4 22l2.828-1.414C9.94 21.303 12 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" fill="currentColor"/><path d="M17.5 15.5c-.5-.25-1.5-.5-2.5-.5-1 0-1.5.5-2 .5s-1.5-.5-2-.5c-1 0-2 .25-2.5.5-.5.25-1 .75-1 1.5s.5 1.5 1 1.5c.5 0 1 .5 1.5.5s1.5-.5 2-.5 1.5.5 2 .5 1.5-.5 2-.5c.5 0 1-.5 1-1.5s-.5-1.25-1-1.5z" fill="#fff"/></svg>
+		                        WhatsApp
+		                      </Button>
+		                    </a>
+		                   )}
+	                  
+	                  {/* Botão de Contato Profissional (se for profissional) */}
+	                  {isProfessional && profile?.professional_whatsapp && (
+	                    <a 
+	                      href={`https://wa.me/${profile.professional_whatsapp.replace(/\D/g, '' )}`} 
+	                      target="_blank" 
+	                      rel="noopener noreferrer"
+	                    >
+	                      <Button variant="outline" className="gap-2 bg-green-500 hover:bg-green-600 text-white">
+	                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M12 2C6.477 2 2 6.477 2 12c0 3.31 1.28 6.31 3.36 8.54l-1.3 3.16 3.36-.88c1.97 1.08 4.2 1.68 6.58 1.68 5.523 0 10-4.477 10-10S17.523 2 12 2z" fill="currentColor"/><path d="M17.5 15.5c-.2-.1-.8-.4-1.2-.5s-.7-.1-1.1.1c-.4.2-.6.7-.8.8s-.4.2-.8.1c-.4-.1-.9-.3-1.7-.8-.6-.4-1.1-.9-1.5-1.4s-.6-.9-.6-1.4c0-.5.1-.8.2-1s.4-.4.6-.6c.2-.2.4-.4.5-.5s.3-.3.4-.5c.1-.2 0-.4 0-.5s-.2-.4-.3-.6c-.1-.2-.3-.5-.5-.7s-.4-.4-.6-.6c-.2-.2-.4-.4-.4-.4s-.3-.2-.4-.2c-.1 0-.3 0-.5 0s-.4.1-.6.3c-.2.2-.8.8-.8 1.9s.8 2.2.9 2.4c.1.2 1.5 2.5 3.6 3.4s2.5.7 2.9.6c.4-.1.9-.4 1.1-.7s.4-.6.4-.9c.1-.3.1-.5 0-.7z" fill="white"/></svg>
+	                        WhatsApp
+	                      </Button>
+	                    </a>
+	                   )}
+	                </>
+	              )}
+	            </div>
 
             {/* Guardian Info */}
             <div className="mt-6 p-4 rounded-lg bg-muted/50">

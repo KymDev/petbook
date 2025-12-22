@@ -12,6 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Story {
+  view_count?: number;
   id: string;
   pet_id: string;
   media_url: string;
@@ -31,6 +32,8 @@ export default function StoryViewer() {
   const navigate = useNavigate();
   const { currentPet } = usePet();
   const [story, setStory] = useState<Story | null>(null);
+  const [professionalViewCount, setProfessionalViewCount] = useState<number>(0);
+  const [viewCount, setViewCount] = useState<number>(0);
   const [allStories, setAllStories] = useState<Story[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -66,6 +69,27 @@ export default function StoryViewer() {
       .eq("id", id)
       .single();
 
+    // Fetch view count
+    const { count } = await supabase
+      .from("story_views")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", id);
+
+    if (count !== null) {
+      setViewCount(count);
+    }
+
+    // Fetch professional view count
+    const { count: profCount } = await supabase
+      .from("story_views")
+      .select("*", { count: "exact", head: true })
+      .eq("story_id", id)
+      .eq("is_professional", true);
+
+    if (profCount !== null) {
+      setProfessionalViewCount(profCount);
+    }
+
     if (!storyData) {
       navigate("/feed");
       return;
@@ -92,6 +116,7 @@ export default function StoryViewer() {
       await supabase.from("story_views").insert({
         story_id: id,
         viewer_pet_id: currentPet.id,
+        // is_professional será preenchido pelo trigger no banco de dados
       }).onConflict("story_id,viewer_pet_id").ignore();
     }
 
@@ -154,6 +179,17 @@ export default function StoryViewer() {
 
       {/* Header */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
+        {/* Contador de Visualizações */}
+        {story.pet?.id === currentPet?.id && (
+          <div className="absolute bottom-4 left-4 text-white text-sm bg-black/50 px-3 py-1 rounded-full z-30">
+            {viewCount} pessoas viram o story do seu pet
+            {professionalViewCount > 0 && (
+              <span className="ml-2 text-yellow-400">
+                ({professionalViewCount} profissional{professionalViewCount > 1 ? "is" : ""})
+              </span>
+            )}
+          </div>
+        )}
         <Link to={`/pet/${story.pet?.id}`} className="flex items-center gap-2">
           <Avatar className="h-10 w-10 border-2 border-white">
             <AvatarImage src={story.pet?.avatar_url || undefined} />
@@ -220,7 +256,7 @@ export default function StoryViewer() {
         </Button>
       )}
 
-      {/* Story Counter */}
+      {/* Story Navigation Counter */}
       <div className="absolute bottom-4 right-4 text-white text-sm bg-black/50 px-3 py-1 rounded-full">
         {currentIndex + 1} / {allStories.length}
       </div>

@@ -122,6 +122,7 @@ export default function ProfessionalSignup() {
 
     setLoading(true);
     try {
+      // 1. Atualizar o perfil do usuário para 'professional'
       await updateProfessionalProfile({
         account_type: "professional",
         professional_bio: formData.professional_bio,
@@ -134,6 +135,42 @@ export default function ProfessionalSignup() {
         professional_service_type: formData.professional_service_type,
         professional_price_range: formData.professional_price_range,
       });
+
+      // 2. Criar ou atualizar o registro na tabela service_providers
+      // Nota: A tabela service_providers é usada para a busca de serviços.
+      // O ID do provedor deve ser o mesmo ID do usuário.
+      const serviceProviderData = {
+        id: user.id, // Usar o ID do usuário como ID do provedor
+        name: user.email || "Profissional PetBook", // Usar o email como nome inicial (pode ser alterado depois)
+        service_type: formData.professional_service_type,
+        description: formData.professional_bio,
+        phone: formData.professional_phone,
+        address: formData.professional_address,
+        city: formData.professional_city,
+        state: formData.professional_state,
+        zip: formData.professional_zip,
+        // is_verified: false, // O default é false
+      };
+
+      // Tentar atualizar primeiro (se já existir)
+      const { error: updateError } = await supabase
+        .from("service_providers")
+        .update(serviceProviderData)
+        .eq("id", user.id);
+
+      if (updateError && updateError.code !== 'PGRST116') { // PGRST116 é "não encontrado"
+        // Se a atualização falhar por outro motivo que não seja "não encontrado", lançar erro
+        throw updateError;
+      }
+
+      // Se a atualização falhou por "não encontrado" ou se não houve erro, tentar inserir
+      if (updateError && updateError.code === 'PGRST116') {
+        const { error: insertError } = await supabase
+          .from("service_providers")
+          .insert(serviceProviderData);
+
+        if (insertError) throw insertError;
+      }
 
       toast.success("Perfil profissional criado com sucesso!");
       await refreshProfile(); // Força a atualização do contexto após o sucesso

@@ -9,18 +9,20 @@ import {
   Phone, 
   Mail, 
   MapPin, 
-  ExternalLink,
+  MessageCircle,
   Stethoscope,
   Scissors,
   Dog,
   ShoppingBag,
   Hotel
 } from 'lucide-react';
+import { formatDistance } from '@/integrations/supabase/geolocationService';
+import { Link } from 'react-router-dom'; // Importar Link para navegação
 
-type ServiceProvider = Database['public']['Tables']['service_providers']['Row'];
+import { ServiceProvider } from '@/integrations/supabase/serviceProvidersService';
 
 interface ServiceProviderCardProps {
-  provider: ServiceProvider;
+  provider: ServiceProvider & { distance?: number };
 }
 
 const serviceTypeConfig = {
@@ -109,7 +111,15 @@ const ServiceProviderCard: React.FC<ServiceProviderCardProps> = ({ provider }) =
           </p>
         )}
 
-        {/* Informações de Contato */}
+        {/* Distancia (se disponivel) */}
+        {provider.distance !== undefined && (
+          <div className="flex items-center gap-2 text-sm bg-blue-50 p-2 rounded">
+            <MapPin className="h-4 w-4 text-blue-600" />
+            <span className="text-blue-600 font-semibold">{formatDistance(provider.distance)} de voce</span>
+          </div>
+        )}
+
+        {/* Informacoes de Contato */}
         <div className="space-y-2 pt-2">
           {provider.phone && (
             <div className="flex items-center gap-2 text-sm">
@@ -133,20 +143,22 @@ const ServiceProviderCard: React.FC<ServiceProviderCardProps> = ({ provider }) =
 
         {/* Ações */}
         <div className="flex gap-2 pt-2">
-          {/* Botão de Solicitar Serviço (NOVO) */}
-          <Button 
-            onClick={() => console.log('TODO: Implementar modal de solicitação para o profissional:', provider.id)} // TODO: Implementar modal de solicitação
-            className="flex-1 gradient-bg"
-            size="sm"
-          >
-            <Stethoscope className="h-4 w-4 mr-2" />
-            Solicitar Serviço
-          </Button>
+          {/* Botão de Chat (NOVO) */}
+          {/* O ID do provedor de serviço é o ID do usuário (user_id) */}
+          <Link to={`/chat/professional/${provider.id}`} className="flex-1">
+            <Button 
+              className="w-full gradient-bg"
+              size="sm"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Chat
+            </Button>
+          </Link>
 
           {provider.phone && (
             <Button 
               onClick={() => handleContact('phone')}
-              className="flex-1" // Removido gradient-bg para dar destaque ao Solicitar Serviço
+              className="flex-1"
               variant="outline"
               size="sm"
             >
@@ -163,17 +175,6 @@ const ServiceProviderCard: React.FC<ServiceProviderCardProps> = ({ provider }) =
             >
               <MapPin className="h-4 w-4 mr-2" />
               Rotas
-            </Button>
-          )}
-          {provider.email && !provider.phone && (
-            <Button 
-              onClick={() => handleContact('email')}
-              variant="outline"
-              className="flex-1"
-              size="sm"
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Email
             </Button>
           )}
         </div>

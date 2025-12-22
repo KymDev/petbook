@@ -16,7 +16,9 @@ interface Notification {
   is_read: boolean;
   created_at: string;
   related_pet_id: string | null;
+  related_user_id: string | null; // Adicionado
   relatedPet?: Pet;
+  relatedUser?: { full_name: string, avatar_url: string | null }; // Adicionado
 }
 
 const Notifications = () => {
@@ -37,16 +39,24 @@ const Notifications = () => {
       .limit(50);
 
     if (data) {
-      const withPets = await Promise.all(
+      const withRelatedData = await Promise.all(
         data.map(async (n) => {
+          let relatedPet: Pet | undefined;
+          let relatedUser: { full_name: string, avatar_url: string | null } | undefined;
+
           if (n.related_pet_id) {
             const { data: pet } = await supabase.from("pets").select("*").eq("id", n.related_pet_id).single();
-            return { ...n, relatedPet: pet };
+            relatedPet = pet as Pet;
+          } else if (n.related_user_id) {
+            // Buscar informações do usuário (profissional)
+            const { data: userProfile } = await supabase.from("user_profiles").select("full_name, avatar_url").eq("id", n.related_user_id).single();
+            relatedUser = userProfile as { full_name: string, avatar_url: string | null };
           }
-          return n;
+
+          return { ...n, relatedPet, relatedUser };
         })
       );
-      setNotifications(withPets);
+      setNotifications(withRelatedData);
       
       // Mark as read
       await supabase.from("notifications").update({ is_read: true }).eq("pet_id", currentPet.id).eq("is_read", false);
@@ -73,6 +83,13 @@ const Notifications = () => {
                     <Avatar>
                       <AvatarImage src={n.relatedPet.avatar_url || undefined} />
                       <AvatarFallback>{n.relatedPet.name[0]}</AvatarFallback>
+                    </Avatar>
+                  </Link>
+                ) : n.relatedUser ? (
+                  <Link to={`/profile/${n.relatedUser.full_name}`}>
+                    <Avatar>
+                      <AvatarImage src={n.relatedUser.avatar_url || undefined} />
+                      <AvatarFallback>{n.relatedUser.full_name[0]}</AvatarFallback>
                     </Avatar>
                   </Link>
                 ) : (

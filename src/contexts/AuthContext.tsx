@@ -9,6 +9,7 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<{ error: Error | null }>;
   isAdmin: boolean;
 }
 
@@ -79,9 +80,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
   };
 
+  const deleteAccount = async () => {
+    if (!user) return { error: new Error("Nenhum usuário logado") };
+
+    try {
+      // Primeiro, deleta o perfil do usuário e todos os dados associados
+      // A RLS do Supabase deve estar configurada para permitir que o usuário delete seus próprios dados
+      
+      // Deleta os pets do usuário
+      const { error: petsError } = await supabase
+        .from("pets")
+        .delete()
+        .eq("user_id", user.id);
+      
+      if (petsError) throw petsError;
+
+      // Deleta o perfil do usuário
+      const { error: profileError } = await supabase
+        .from("user_profiles")
+        .delete()
+        .eq("id", user.id);
+      
+      if (profileError) throw profileError;
+
+      // Deleta a conta de autenticação do Supabase
+      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+      
+      if (authError) throw authError;
+
+      // Faz logout
+      await supabase.auth.signOut();
+
+      return { error: null };
+    } catch (error: any) {
+      console.error("Erro ao deletar conta:", error);
+      return { error: error as Error };
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signUp, signIn, signOut, isAdmin }}
+      value={{ user, session, loading, signUp, signIn, signOut, deleteAccount, isAdmin }}
     >
       {children}
     </AuthContext.Provider>

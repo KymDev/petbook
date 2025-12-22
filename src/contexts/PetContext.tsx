@@ -29,6 +29,7 @@ interface PetContextType {
   followPet: (id: string) => Promise<void>;
   unfollowPet: (id: string) => Promise<void>;
   searchPets: (query: string) => Pet[];
+  deletePet: (petId: string) => Promise<void>;
   isProfessionalFollowing: (targetPetId: string) => Promise<boolean>; // NOVO
 }
 
@@ -64,7 +65,12 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setMyPets(data || []);
-    setCurrentPet(data?.[0] ?? null);
+    // Se o usuário for um profissional, currentPet deve ser null
+    if (profile?.account_type === 'professional') {
+      setCurrentPet(null);
+    } else {
+      setCurrentPet(data?.[0] ?? null);
+    }
   };
 
   const loadAllPets = async () => {
@@ -154,6 +160,26 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deletePet = async (petId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("pets")
+      .delete()
+      .eq("id", petId)
+      .eq("user_id", user.id); // Garante que só o dono pode excluir
+
+    if (error) throw error;
+
+    // Atualiza a lista de pets no contexto
+    setMyPets(prev => prev.filter(p => p.id !== petId));
+    
+    // Se o pet excluído era o pet atual, define o novo pet atual
+    if (currentPet?.id === petId) {
+      setCurrentPet(myPets.filter(p => p.id !== petId)[0] || null);
+    }
+  };
+
   const searchPets = (query: string) => {
     const q = query.toLowerCase();
     return allPets.filter(
@@ -184,7 +210,7 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
 
     // Se o usuário está logado e o perfil carregou, carrega os pets
     refreshAll();
-  }, [user, profileLoading]);
+  }, [user, profileLoading, profile]); // Adicionado 'profile' como dependência para reagir à troca de conta
 
 
   useEffect(() => {
@@ -208,6 +234,7 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
         followPet,
         unfollowPet,
         searchPets,
+        deletePet,
         isProfessionalFollowing, // NOVO
       }}
     >

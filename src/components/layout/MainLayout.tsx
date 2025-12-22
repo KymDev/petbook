@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PetBookLogo } from "@/components/PetBookLogo";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,6 +34,7 @@ import {
   Users,
   CheckCircle,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -43,7 +44,6 @@ interface MainLayoutProps {
 const primaryNavItems = [
   { href: "/feed", icon: Home, label: "Feed" },
   { href: "/explore", icon: Search, label: "Explorar" },
-  { href: "/notifications", icon: Bell, label: "Notificações" },
   { href: "/chat", icon: MessageCircle, label: "Chat" },
   { href: "/services", icon: Stethoscope, label: "Serviços Pet" },
 ];
@@ -60,6 +60,46 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (currentPet) {
+      fetchUnreadNotifications();
+      
+      // Subscribe to notifications changes
+      const channel = supabase
+        .channel('notifications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `pet_id=eq.${currentPet.id}`
+          },
+          () => {
+            fetchUnreadNotifications();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [currentPet]);
+
+  const fetchUnreadNotifications = async () => {
+    if (!currentPet) return;
+    
+    const { count } = await supabase
+      .from("notifications")
+      .select("*", { count: 'exact', head: true })
+      .eq("pet_id", currentPet.id)
+      .eq("is_read", false);
+
+    setUnreadCount(count || 0);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -72,6 +112,12 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     if (type === 'professional') {
       navigate('/professional-profile');
     }
+  };
+
+  const formatNotificationCount = (count: number) => {
+    if (count === 0) return null;
+    if (count > 9) return "+9";
+    return count.toString();
   };
 
   return (
@@ -104,6 +150,25 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 </Link>
               );
             })}
+            
+            {/* Notificações - Apenas sininho com contador */}
+            <Link to="/notifications">
+              <Button
+                variant={location.pathname === "/notifications" ? "default" : "ghost"}
+                size="sm"
+                className={cn(
+                  "relative",
+                  location.pathname === "/notifications" && "gradient-bg"
+                )}
+              >
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-semibold">
+                    {formatNotificationCount(unreadCount)}
+                  </span>
+                )}
+              </Button>
+            </Link>
           </nav>
 
           {/* Right Side Actions */}
@@ -292,6 +357,25 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 </Link>
               );
             })}
+            
+            {/* Notificações no mobile */}
+            <Link
+              to="/notifications"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Button
+                variant={location.pathname === "/notifications" ? "default" : "ghost"}
+                className={cn("w-full justify-start gap-3 relative", location.pathname === "/notifications" && "gradient-bg")}
+              >
+                <Bell className="h-5 w-5" />
+                Notificações
+                {unreadCount > 0 && (
+                  <span className="ml-auto h-6 w-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-semibold">
+                    {formatNotificationCount(unreadCount)}
+                  </span>
+                )}
+              </Button>
+            </Link>
             
             <div className="h-px bg-border my-2" />
             

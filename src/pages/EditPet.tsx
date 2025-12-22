@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePet } from "@/contexts/PetContext";
-import { useUserProfile } from "@/contexts/UserProfileContext";
+import { usePet, Pet } from "@/contexts/PetContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PetBookLogo } from "@/components/PetBookLogo";
 import { Button } from "@/components/ui/button";
@@ -12,8 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
-import { Loader2, Upload, PawPrint } from "lucide-react";
+	import { z } from "zod";
+	import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+	import { Loader2, Upload, PawPrint, Save, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const petSchema = z.object({
@@ -37,15 +37,17 @@ const speciesOptions = [
   { value: "outro", label: "🐾 Outro" },
 ];
 
-const CreatePet = () => {
+const EditPet = () => {
+  const { petId } = useParams<{ petId: string }>();
   const { user } = useAuth();
-  const { refreshAll } = usePet();
-  const { refreshProfile } = useUserProfile(); // <-- NOVO: Para forçar o refresh do profile
+  const { myPets, refreshAll } = usePet();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [initialPet, setInitialPet] = useState<Pet | null>(null);
   const [form, setForm] = useState({
     name: "",
     species: "",
@@ -56,14 +58,59 @@ const CreatePet = () => {
     guardian_instagram_username: "",
   });
 
-  if (!user) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p>Carregando usuário...</p>
-    </div>
-   );
-  }
+  useEffect(() => {
+    const petToEdit = myPets.find(p => p.id === petId);
+    if (petToEdit) {
+      setInitialPet(petToEdit);
+      setForm({
+        name: petToEdit.name,
+        species: petToEdit.species,
+        breed: petToEdit.breed,
+        age: petToEdit.age.toString(),
+        bio: petToEdit.bio || "",
+        guardian_name: petToEdit.guardian_name,
+        guardian_instagram_username: petToEdit.guardian_instagram_username,
+      });
+      setAvatarUrl(petToEdit.avatar_url);
+      setLoading(false);
+    } else if (petId) {
+      // Se não estiver no contexto, tenta buscar no Supabase (caso seja o primeiro pet)
+      fetchPetData(petId);
+    } else {
+      navigate("/feed"); // Redireciona se não tiver petId
+    }
+  }, [petId, myPets, navigate]);
 
+  const fetchPetData = async (id: string) => {
+    const { data, error } = await supabase
+      .from("pets")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
+      toast({
+        title: "Erro",
+        description: "Pet não encontrado ou você não tem permissão para editar.",
+        variant: "destructive",
+      });
+      navigate("/feed");
+      return;
+    }
+
+    setInitialPet(data as Pet);
+    setForm({
+      name: data.name,
+      species: data.species,
+      breed: data.breed,
+      age: data.age.toString(),
+      bio: data.bio || "",
+      guardian_name: data.guardian_name,
+      guardian_instagram_username: data.guardian_instagram_username,
+    });
+    setAvatarUrl(data.avatar_url);
+    setLoading(false);
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,7 +121,7 @@ const CreatePet = () => {
   };
 
   const uploadAvatar = async (): Promise<string | null> => {
-    if (!avatarFile || !user) return null;
+    if (!avatarFile || !user) return initialPet?.avatar_url || null;
     
     const fileExt = avatarFile.name.split(".").pop();
     const fileName = `${user.id}-${Date.now()}.${fileExt}`;
@@ -95,20 +142,12 @@ const CreatePet = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("handleSubmit CHAMADO");
-    console.log("handleSubmit chamado");
-    console.log("Usuário:", user);
-    console.log("User ID:", user?.id);
-    console.log("Form data:", form);
-    console.log("Form age parsed:", parseInt(form.age));
-    if (!user) return;
+    if (!user || !petId) return;
 
     const validation = petSchema.safeParse({
       ...form,
       age: parseInt(form.age) || 0,
     });
-
-    console.log("VALIDAÇÃO:", validation);
 
     if (!validation.success) {
       toast({
@@ -119,15 +158,14 @@ const CreatePet = () => {
       return;
     }
 
-    setLoading(true);
+    setIsSaving(true);
     try {
-      let finalAvatarUrl = null;
+      let finalAvatarUrl = initialPet?.avatar_url || null;
       if (avatarFile) {
         finalAvatarUrl = await uploadAvatar();
       }
 
-      const { error } = await supabase.from("pets").insert({
-        user_id: user.id,
+      const { error } = await supabase.from("pets").update({
         name: form.name,
         species: form.species,
         breed: form.breed,
@@ -136,22 +174,17 @@ const CreatePet = () => {
         avatar_url: finalAvatarUrl,
         guardian_name: form.guardian_name,
         guardian_instagram_username: form.guardian_instagram_username.replace("@", ""),
-      });
-
-      // Garantir que o tipo de conta do usuário seja 'user' após o primeiro pet ser criado
-      const { error: profileError } = await supabase.from("user_profiles").update({ account_type: 'user' }).eq("id", user.id);
-      if (profileError) throw profileError;
+      }).eq("id", petId).eq("user_id", user.id); // Garante que só o dono edita
 
       if (error) throw error;
 
       toast({
-        title: "Pet cadastrado!",
-        description: `${form.name} agora faz parte do PetBook! 🎉`,
+        title: "Pet atualizado!",
+        description: `${form.name} teve seu perfil atualizado com sucesso.`,
       });
 
-      await refreshAll(); // <-- Chamando refreshAll para pets
-      await refreshProfile(); // <-- NOVO: Chamando refreshProfile para atualizar o account_type no contexto
-      navigate("/feed");
+      await refreshAll();
+      navigate(`/pet/${petId}`);
     } catch (error: any) {
       console.error("ERRO NO SUBMIT:", error);
       toast({
@@ -160,18 +193,59 @@ const CreatePet = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
-    }
-  };
+	      setIsSaving(false);
+	    }
+	  };
+	
+	  const handleDelete = async () => {
+	    if (!petId) return;
+	
+	    setIsSaving(true);
+	    try {
+	      await deletePet(petId);
+	
+	      toast({
+	        title: "Pet Excluído",
+	        description: `${initialPet?.name} foi removido com sucesso.`,
+	      });
+	
+	      navigate("/feed"); // Redireciona para o feed ou lista de pets
+	    } catch (error: any) {
+	      console.error("ERRO AO EXCLUIR PET:", error);
+	      toast({
+	        title: "Erro",
+	        description: error.message || "Algo deu errado ao excluir o pet. Tente novamente.",
+	        variant: "destructive",
+	      });
+	    } finally {
+	      setIsSaving(false);
+	    }
+	  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!initialPet) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Pet não encontrado ou acesso negado.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-hero py-8 px-4">
       <div className="max-w-lg mx-auto space-y-6 animate-slide-up">
         <div className="text-center">
           <PetBookLogo size="md" className="justify-center" />
-          <h1 className="mt-4 text-2xl font-heading font-bold">Cadastre seu Pet</h1>
+          <h1 className="mt-4 text-2xl font-heading font-bold">Editar Perfil de {initialPet.name}</h1>
           <p className="text-muted-foreground">
-            Preencha as informações do seu amiguinho
+            Atualize as informações do seu amiguinho
           </p>
         </div>
 
@@ -198,7 +272,7 @@ const CreatePet = () => {
                 <Label htmlFor="avatar" className="cursor-pointer">
                   <div className="flex items-center gap-2 text-sm text-primary hover:underline">
                     <Upload className="h-4 w-4" />
-                    Escolher foto
+                    Mudar foto
                   </div>
                   <Input
                     id="avatar"
@@ -218,7 +292,7 @@ const CreatePet = () => {
                     placeholder="Ex: Thor"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    disabled={loading}
+                    disabled={isSaving}
                   />
                 </div>
 
@@ -232,7 +306,7 @@ const CreatePet = () => {
                     max="50"
                     value={form.age}
                     onChange={(e) => setForm({ ...form, age: e.target.value })}
-                    disabled={loading}
+                    disabled={isSaving}
                   />
                 </div>
               </div>
@@ -243,7 +317,7 @@ const CreatePet = () => {
                   <Select
                     value={form.species}
                     onValueChange={(value) => setForm({ ...form, species: value })}
-                    disabled={loading}
+                    disabled={isSaving}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione" />
@@ -265,7 +339,7 @@ const CreatePet = () => {
                     placeholder="Ex: Golden Retriever"
                     value={form.breed}
                     onChange={(e) => setForm({ ...form, breed: e.target.value })}
-                    disabled={loading}
+                    disabled={isSaving}
                   />
                 </div>
               </div>
@@ -277,7 +351,7 @@ const CreatePet = () => {
                   placeholder="Conte um pouco sobre seu pet..."
                   value={form.bio}
                   onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                  disabled={loading}
+                  disabled={isSaving}
                   rows={3}
                 />
               </div>
@@ -294,7 +368,7 @@ const CreatePet = () => {
                     placeholder="Ex: João Silva"
                     value={form.guardian_name}
                     onChange={(e) => setForm({ ...form, guardian_name: e.target.value })}
-                    disabled={loading}
+                    disabled={isSaving}
                   />
                 </div>
 
@@ -307,28 +381,64 @@ const CreatePet = () => {
                       placeholder="seuusername"
                       value={form.guardian_instagram_username}
                       onChange={(e) => setForm({ ...form, guardian_instagram_username: e.target.value.replace("@", "") })}
-                      disabled={loading}
+                      disabled={isSaving}
                       className="pl-8"
                     />
                   </div>
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full gradient-bg"
-                size="lg"
-              >
-                {loading ? (
+	              <Button
+	                type="submit"
+	                disabled={isSaving}
+	                className="w-full gradient-bg"
+	                size="lg"
+	              >
+                {isSaving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <PawPrint className="h-4 w-4 mr-2" />
-                    Cadastrar Pet
-                  </>
-                )}
-              </Button>
+	                <Save className="h-4 w-4 mr-2" />
+	                    Salvar Alterações
+	                  </>
+	                )}
+	              </Button>
+	
+	              <AlertDialog>
+	                <AlertDialogTrigger asChild>
+	                  <Button
+	                    type="button"
+	                    variant="outline"
+	                    className="w-full border-red-500 text-red-500 hover:bg-red-50 hover:text-red-600"
+	                    size="lg"
+	                  >
+	                    <Trash2 className="h-4 w-4 mr-2" />
+	                    Excluir Pet
+	                  </Button>
+	                </AlertDialogTrigger>
+	                <AlertDialogContent>
+	                  <AlertDialogHeader>
+	                    <AlertDialogTitle>Tem certeza que deseja excluir {initialPet.name}?</AlertDialogTitle>
+	                    <AlertDialogDescription>
+	                      Esta ação é irreversível. Todos os dados, posts e interações de {initialPet.name} serão permanentemente removidos.
+	                    </AlertDialogDescription>
+	                  </AlertDialogHeader>
+	                  <AlertDialogFooter>
+	                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+	                    <AlertDialogAction
+	                      onClick={handleDelete}
+	                      className="bg-red-500 hover:bg-red-600"
+	                      disabled={isSaving}
+	                    >
+	                      {isSaving ? (
+	                        <Loader2 className="h-4 w-4 animate-spin" />
+	                      ) : (
+	                        "Excluir Permanentemente"
+	                      )}
+	                    </AlertDialogAction>
+	                  </AlertDialogFooter>
+	                </AlertDialogContent>
+	              </AlertDialog>
             </form>
           </CardContent>
         </Card>
@@ -337,4 +447,4 @@ const CreatePet = () => {
   );
 };
 
-export default CreatePet;
+export default EditPet;

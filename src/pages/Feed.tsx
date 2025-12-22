@@ -83,7 +83,36 @@ const Feed = () => {
   const fetchFeedPostsForProfessional = async () => {
     setLoading(true);
 
-    // Profissionais veem posts de todos os pets (comunidade)
+    if (!user) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
+    // 1. Buscar os pets seguidos pelo profissional
+    const { data: following, error: followingError } = await supabase
+      .from("followers")
+      .select("target_pet_id")
+      .eq("follower_id", user.id)
+      .eq("is_user_follower", true);
+
+    if (followingError) {
+      console.error("Erro ao buscar pets seguidos pelo profissional:", followingError);
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
+    const followingPetIds = following?.map(f => f.target_pet_id) || [];
+    
+    // Se não segue ninguém, o feed fica vazio
+    if (followingPetIds.length === 0) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Buscar posts dos pets seguidos
     const { data, error } = await supabase
       .from("posts")
       .select(`
@@ -93,15 +122,15 @@ const Feed = () => {
           name, 
           avatar_url, 
           guardian_name, 
-          user_profile:user_id(account_type)
+          user_profiles:user_id(account_type)
         )
       `)
+      .in("pet_id", followingPetIds)
       .order("created_at", { ascending: false })
       .limit(50);
 
     if (error) {
       console.error("Erro ao buscar posts para profissional:", error);
-      // Em caso de erro, ainda exibe o feed, mas vazio
       setPosts([]);
       setLoading(false);
       return;
@@ -216,7 +245,7 @@ const Feed = () => {
           /* FEED COM POSTS */
           <div className="space-y-6">
             {posts.map(post => (
-              <PostCard key={post.id} post={post} />
+              <PostCard key={post.id} post={post} profile={profile} />
             ))}
           </div>
         )}
