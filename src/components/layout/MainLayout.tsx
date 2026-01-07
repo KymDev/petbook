@@ -99,7 +99,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         supabase.removeChannel(channel);
       };
     }
-  }, [currentPet, profile, user]);
+  }, [currentPet?.id, profile?.account_type, user?.id]);
 
   const fetchUnreadNotifications = async () => {
     const isProfessional = profile?.account_type === 'professional';
@@ -180,12 +180,22 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     }
   };
 
-  const navItems = [
+  // Itens de navegação para Desktop
+  const desktopNavItems = [
     { href: "/feed", icon: Home, label: "Feed" },
     { href: "/explore", icon: Search, label: "Explorar" },
-    { href: "/create-post", icon: PlusSquare, label: "Postar", hideOnDesktop: true },
     { href: "/services", icon: Stethoscope, label: "Serviços" },
     { href: "/chat", icon: MessageCircle, label: "Chat" },
+  ];
+
+  // Itens de navegação para Mobile (Barra Inferior)
+  // Ordem solicitada: Feed, Mensagem (Chat), Criar Posts, Explorar, Serviços
+  const mobileNavItems = [
+    { href: "/feed", icon: Home, label: "Feed" },
+    { href: "/chat", icon: MessageCircle, label: "Mensagens" },
+    { href: "/create-post", icon: PlusSquare, label: "Criar" },
+    { href: "/explore", icon: Search, label: "Explorar" },
+    { href: "/services", icon: Stethoscope, label: "Serviços" },
   ];
 
   return (
@@ -198,7 +208,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           </Link>
 
           <nav className="hidden md:flex items-center gap-4">
-            {navItems.filter(i => !i.hideOnDesktop).map((item) => {
+            {desktopNavItems.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link key={item.href} to={item.href} className={cn(
@@ -243,6 +253,15 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                   <span>Modo Profissional</span>
                   {isProfessional && <span className="ml-auto text-primary">✓</span>}
                 </DropdownMenuItem>
+                
+                {isProfessional && (
+                  <DropdownMenuItem asChild>
+                    <Link to="/professional-dashboard" className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4" />
+                      Dashboard Profissional
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 
                 {/* Opções de Gerenciamento de Pets (Apenas Modo Guardião) */}
@@ -403,7 +422,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
       {/* Mobile Bottom Tab Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-background border-t border-border flex items-center justify-around z-50 px-2">
-        {navItems.map((item) => {
+        {mobileNavItems.map((item) => {
           const isActive = location.pathname === item.href;
           return (
             <Link key={item.href} to={item.href} className="flex flex-col items-center justify-center w-full h-full transition-colors">
@@ -414,21 +433,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             </Link>
           );
         })}
-        <Link to={isProfessional ? "/professional-profile" : (currentPet ? `/pet/${currentPet.id}` : "/create-pet")} className="flex items-center justify-center w-full h-full">
-          <Avatar className={cn(
-            "h-7 w-7 border transition-all",
-            location.pathname.includes("/pet/") || location.pathname === "/professional-profile" ? "border-primary ring-1 ring-primary" : "border-border"
-          )}>
-            {isProfessional ? (
-              <AvatarImage src={profile?.professional_avatar_url || undefined} />
-            ) : (
-              <AvatarImage src={currentPet?.avatar_url || undefined} />
-            )}
-            <AvatarFallback className="text-[10px]">
-              {isProfessional ? profile?.full_name?.[0] : currentPet?.name?.[0] || "?"}
-            </AvatarFallback>
-          </Avatar>
-        </Link>
       </nav>
     </div>
   );

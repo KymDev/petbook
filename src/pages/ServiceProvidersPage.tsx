@@ -21,10 +21,12 @@ type ServiceType = Database['public']['Enums']['service_type'];
 const serviceTypeOptions: { value: ServiceType | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos os Serviços' },
   { value: 'veterinario', label: 'Veterinário' },
-  { value: 'banho_tosa', label: 'Banho & Tosa' },
+  { value: 'groomer', label: 'Banho & Tosa' },
   { value: 'passeador', label: 'Passeador' },
-  { value: 'loja', label: 'Loja Pet' },
-  { value: 'hotel', label: 'Hotel Pet' },
+  { value: 'adestrador', label: 'Adestrador' },
+  { value: 'pet_sitter', label: 'Pet Sitter' },
+  { value: 'fotografo', label: 'Fotógrafo' },
+  { value: 'outros', label: 'Outros' },
 ];
 
 const ServiceProvidersPage: React.FC = () => {

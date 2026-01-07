@@ -233,6 +233,7 @@ const ProfessionalProfile = () => {
                   }))
                 }
                 bucketPath={`professional_avatars/${profile.id}`}
+                bucketName="petbook-media"
                 fallbackText={profile.full_name ? profile.full_name[0] : "P"}
               />
             </CardContent>

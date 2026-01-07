@@ -16,7 +16,8 @@ export default function SignupChoice() {
       if (setAccountType) {
         await setAccountType("user");
       }
-      navigate("/feed");
+      // Redireciona para a raiz para que o RootRedirect decida se vai para /feed ou /create-pet
+      navigate("/", { replace: true });
     } catch (error) {
       toast.error("Erro ao definir tipo de conta");
     }
@@ -28,12 +29,8 @@ export default function SignupChoice() {
         await setAccountType("professional");
       }
       
-      // Se o perfil já estiver completo, vai direto para o dashboard
-      if (isProfileComplete || profile?.professional_bio) {
-        navigate("/professional-dashboard");
-      } else {
-        navigate("/professional-signup");
-      }
+      // Após definir o tipo de conta, redireciona para a raiz para processar a lógica de destino
+      navigate("/", { replace: true });
     } catch (error) {
       toast.error("Erro ao definir tipo de conta");
     }

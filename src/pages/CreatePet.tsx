@@ -148,7 +148,9 @@ const CreatePet = () => {
 
       await refreshAll(); // <-- Chamando refreshAll para pets
       await refreshProfile(); // <-- NOVO: Chamando refreshProfile para atualizar o account_type no contexto
-      navigate("/feed");
+      
+      // Redireciona para a raiz para garantir que toda a lógica de estado seja reprocessada
+      navigate("/", { replace: true });
     } catch (error: any) {
       console.error("ERRO NO SUBMIT:", error);
       toast({

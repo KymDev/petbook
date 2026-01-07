@@ -15,8 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Briefcase, MapPin, Award, DollarSign, ArrowLeft, Loader2, Stethoscope } from "lucide-react";
-import { motion } from "framer-motion";
+import { Briefcase, MapPin, Award, DollarSign, ArrowLeft, Loader2, Stethoscope, PlusCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 const PROFESSIONAL_TYPES = [
@@ -60,6 +60,7 @@ export default function ProfessionalSignup() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     professional_service_type: "",
+    professional_custom_service_type: "",
     professional_bio: "",
     professional_phone: "",
     professional_whatsapp: "",
@@ -71,7 +72,6 @@ export default function ProfessionalSignup() {
     professional_price_range: "",
     professional_crmv: "",
     professional_crmv_state: "",
-    // Novos campos para geolocalização
     professional_latitude: null as number | null,
     professional_longitude: null as number | null,
   });
@@ -93,6 +93,8 @@ export default function ProfessionalSignup() {
     setFormData((prev) => ({
       ...prev,
       professional_service_type: value,
+      // Limpa o tipo customizado se mudar de 'outro'
+      professional_custom_service_type: value === 'outro' ? prev.professional_custom_service_type : "",
     }));
   };
 
@@ -108,9 +110,13 @@ export default function ProfessionalSignup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validações
     if (!formData.professional_service_type) {
       toast.error("Selecione sua profissão");
+      return;
+    }
+
+    if (formData.professional_service_type === 'outro' && !formData.professional_custom_service_type.trim()) {
+      toast.error("Especifique sua profissão");
       return;
     }
 
@@ -157,24 +163,37 @@ export default function ProfessionalSignup() {
 
     setLoading(true);
     try {
-      // 1. Tentar geocodificar o endereço
       let latitude: number | null = null;
       let longitude: number | null = null;
       
-      const fullAddress = `${formData.professional_address}, ${formData.professional_city}, ${formData.professional_state}, ${formData.professional_zip}`;
+      // Tenta geocodificar o endereço
+      const addressToGeocode = `${formData.professional_address ? formData.professional_address + ', ' : ''}${formData.professional_city}, ${formData.professional_state}, Brasil`;
       
-      if (formData.professional_city.trim() && formData.professional_state.trim()) {
-        try {
-          const location = await geocodeAddress(fullAddress);
-          latitude = location.latitude;
-          longitude = location.longitude;
-        } catch (geoError) {
-          console.warn("Erro ao geocodificar endereço, prosseguindo sem coordenadas:", geoError);
-          toast.warning("Não foi possível obter as coordenadas do endereço. A busca por proximidade pode ser limitada.");
-        }
+      try {
+        const location = await geocodeAddress(addressToGeocode);
+        latitude = location.latitude;
+        longitude = location.longitude;
+      } catch (geoError) {
+        console.warn("Erro ao geocodificar endereço, continuando sem coordenadas:", geoError);
+        // Não bloqueia o cadastro se a geocodificação falhar
       }
 
-      // 1. Atualizar o perfil do usuário para 'professional'
+      // Mapeia o tipo de serviço para o enum do banco de dados se necessário
+      // O banco usa: "adestrador" | "passeador" | "veterinario" | "pet_sitter" | "groomer" | "fotografo" | "outros"
+      const serviceTypeMap: Record<string, string> = {
+        'veterinario': 'veterinario',
+        'banho_tosa': 'groomer',
+        'passeador': 'passeador',
+        'loja': 'outros',
+        'hotel': 'outros',
+        'treinador': 'adestrador',
+        'pet_sitter': 'pet_sitter',
+        'fotografo': 'fotografo',
+        'outro': 'outros'
+      };
+
+      const dbServiceType = serviceTypeMap[formData.professional_service_type] || 'outros';
+
       await updateProfessionalProfile({
         professional_latitude: latitude,
         professional_longitude: longitude,
@@ -187,7 +206,8 @@ export default function ProfessionalSignup() {
         professional_state: formData.professional_state,
         professional_zip: formData.professional_zip,
         professional_specialties: formData.professional_specialties,
-        professional_service_type: formData.professional_service_type,
+        professional_service_type: dbServiceType,
+        professional_custom_service_type: formData.professional_custom_service_type || formData.professional_service_type,
         professional_price_range: formData.professional_price_range,
         professional_crmv: formData.professional_crmv,
         professional_crmv_state: formData.professional_crmv_state,
@@ -195,10 +215,11 @@ export default function ProfessionalSignup() {
 
       toast.success("Perfil profissional criado com sucesso!");
       await refreshProfile();
-      navigate("/professional-dashboard");
-    } catch (error) {
+      navigate("/professional-dashboard", { replace: true });
+    } catch (error: any) {
       console.error("Erro ao criar perfil profissional:", error);
-      toast.error("Erro ao criar perfil profissional");
+      const errorMessage = error.message || "Erro ao criar perfil profissional";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -206,14 +227,12 @@ export default function ProfessionalSignup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/5 flex flex-col items-center justify-center px-4 py-8">
-      {/* Background Blobs */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-secondary/10 blur-[100px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/10 blur-[100px]" />
       </div>
 
       <div className="relative z-10 w-full max-w-2xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -243,7 +262,6 @@ export default function ProfessionalSignup() {
           </div>
         </motion.div>
 
-        {/* Form Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -259,69 +277,96 @@ export default function ProfessionalSignup() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Professional Type */}
-                <div className="space-y-2">
-                  <Label htmlFor="professional_service_type" className="flex items-center gap-2 font-semibold">
-                    <Award className="w-4 h-4" />
-                    Tipo de Profissional *
-                  </Label>
-                  <Select value={formData.professional_service_type} onValueChange={handleSelectChange}>
-                    <SelectTrigger id="professional_service_type" className="h-11">
-                      <SelectValue placeholder="Selecione sua profissão" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PROFESSIONAL_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* CRMV Fields for Veterinarians */}
-                {formData.professional_service_type === 'veterinario' && (
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-4 p-4 rounded-lg bg-blue-500/5 border border-blue-500/20"
-                  >
-                    <Label className="flex items-center gap-2 font-semibold text-blue-600">
-                      <Stethoscope className="w-4 h-4" />
-                      Dados do CRMV *
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="professional_service_type" className="flex items-center gap-2 font-semibold">
+                      <Award className="w-4 h-4" />
+                      Tipo de Profissional *
                     </Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="professional_crmv">Número CRMV</Label>
+                    <Select value={formData.professional_service_type} onValueChange={handleSelectChange}>
+                      <SelectTrigger id="professional_service_type" className="h-11">
+                        <SelectValue placeholder="Selecione sua profissão" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PROFESSIONAL_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <AnimatePresence>
+                    {(formData.professional_service_type === 'outro' || formData.professional_service_type === 'loja' || formData.professional_service_type === 'hotel') && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-2"
+                      >
+                        <Label htmlFor="professional_custom_service_type" className="flex items-center gap-2 font-semibold text-secondary">
+                          <PlusCircle className="w-4 h-4" />
+                          Especifique sua Profissão *
+                        </Label>
                         <Input
-                          id="professional_crmv"
-                          name="professional_crmv"
-                          placeholder="00000"
-                          value={formData.professional_crmv}
+                          id="professional_custom_service_type"
+                          name="professional_custom_service_type"
+                          placeholder="Ex: Adestrador, Terapeuta Holístico, etc."
+                          value={formData.professional_custom_service_type}
                           onChange={handleInputChange}
+                          className="h-11 border-secondary/30 focus-visible:ring-secondary"
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="professional_crmv_state">Estado (UF)</Label>
-                        <Select 
-                          value={formData.professional_crmv_state} 
-                          onValueChange={(val) => setFormData(prev => ({ ...prev, professional_crmv_state: val }))}
-                        >
-                          <SelectTrigger id="professional_crmv_state">
-                            <SelectValue placeholder="UF" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BRAZILIAN_STATES.map(state => (
-                              <SelectItem key={state} value={state}>{state}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Esses dados são necessários para exibir o selo de "Profissional de Saúde Pet".
-                    </p>
-                  </motion.div>
-                )}
+                      </motion.div>
+                    )}
+
+                    {formData.professional_service_type === 'veterinario' && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-4 p-4 rounded-lg bg-blue-50/50 border border-blue-200"
+                      >
+                        <Label className="flex items-center gap-2 font-semibold text-blue-600">
+                          <Stethoscope className="w-4 h-4" />
+                          Dados do CRMV *
+                        </Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="professional_crmv">Número CRMV</Label>
+                            <Input
+                              id="professional_crmv"
+                              name="professional_crmv"
+                              placeholder="00000"
+                              value={formData.professional_crmv}
+                              onChange={handleInputChange}
+                              className="bg-background"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="professional_crmv_state">Estado (UF)</Label>
+                            <Select 
+                              value={formData.professional_crmv_state} 
+                              onValueChange={(val) => setFormData(prev => ({ ...prev, professional_crmv_state: val }))}
+                            >
+                              <SelectTrigger id="professional_crmv_state" className="bg-background">
+                                <SelectValue placeholder="UF" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {BRAZILIAN_STATES.map(state => (
+                                  <SelectItem key={state} value={state}>{state}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <p className="text-xs text-blue-600/80 italic">
+                          O CRMV é obrigatório para exibir o selo de verificação de saúde.
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
 
                 {/* Bio */}
                 <div className="space-y-2">
@@ -497,7 +542,6 @@ export default function ProfessionalSignup() {
           </Card>
         </motion.div>
 
-        {/* Info Footer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

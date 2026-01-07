@@ -65,17 +65,40 @@ export function getUserLocation(): Promise<Location> {
 
 /**
  * Converte um endereço em coordenadas usando a API de Geocodificação
- * (Requer integração com um serviço de geocodificação como Google Maps ou OpenStreetMap)
  * @param address Endereço a ser convertido
  * @returns Promise com latitude e longitude
  */
 export async function geocodeAddress(address: string): Promise<Location> {
   try {
-    // Exemplo usando OpenStreetMap Nominatim (gratuito, sem chave de API)
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+    // Tenta primeiro com o endereço completo
+    let response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+      {
+        headers: {
+          'Accept-Language': 'pt-BR,pt;q=0.9',
+          'User-Agent': 'PetBook-App'
+        }
+      }
     );
-    const data = await response.json();
+    let data = await response.json();
+
+    // Se não encontrar, tenta simplificar o endereço (apenas cidade e estado)
+    if (data.length === 0) {
+      const parts = address.split(',');
+      if (parts.length > 2) {
+        const simplifiedAddress = parts.slice(-2).join(',').trim();
+        response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplifiedAddress)}&limit=1`,
+          {
+            headers: {
+              'Accept-Language': 'pt-BR,pt;q=0.9',
+              'User-Agent': 'PetBook-App'
+            }
+          }
+        );
+        data = await response.json();
+      }
+    }
 
     if (data.length === 0) {
       throw new Error("Endereço não encontrado");
@@ -88,7 +111,8 @@ export async function geocodeAddress(address: string): Promise<Location> {
       address: result.display_name,
     };
   } catch (error) {
-    throw new Error(`Erro ao geocodificar endereço: ${error}`);
+    console.error("Erro detalhado na geocodificação:", error);
+    throw error;
   }
 }
 

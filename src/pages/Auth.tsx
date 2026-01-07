@@ -82,8 +82,8 @@ const Auth = () => {
             variant: "destructive",
           });
         } else {
-          // ----- LINHA CORRIGIDA -----
-          navigate("/", { replace: true }); // CORREÇÃO AQUI
+          // Redireciona para a raiz para que o RootRedirect decida o destino com base no perfil
+          navigate("/", { replace: true });
         }
       }
     } catch (error: any) {

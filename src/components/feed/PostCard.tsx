@@ -286,12 +286,29 @@ export const PostCard = ({ post, profile }: PostCardProps) => {
             <Dialog>
               <DialogTrigger asChild>
                 <div className="relative">
-                  <img src={post.media_url} alt="Post" className="w-full object-cover max-h-[500px] cursor-pointer" />
+                  {post.type === 'video' ? (
+                    <video 
+                      src={post.media_url} 
+                      className="w-full object-cover max-h-[500px] cursor-pointer" 
+                      controls
+                    />
+                  ) : (
+                    <img src={post.media_url} alt="Post" className="w-full object-cover max-h-[500px] cursor-pointer" />
+                  )}
                   <Button variant="ghost" size="icon" className="absolute top-2 right-2 bg-black/50 text-white hover:bg-black/70"><Maximize className="h-4 w-4" /></Button>
                 </div>
               </DialogTrigger>
               <DialogContent className="max-w-4xl p-0 border-0 bg-transparent">
-                <img src={post.media_url} alt="Post" className="w-full h-auto max-h-[90vh] object-contain" />
+                {post.type === 'video' ? (
+                  <video 
+                    src={post.media_url} 
+                    className="w-full h-auto max-h-[90vh] object-contain" 
+                    controls 
+                    autoPlay
+                  />
+                ) : (
+                  <img src={post.media_url} alt="Post" className="w-full h-auto max-h-[90vh] object-contain" />
+                )}
               </DialogContent>
             </Dialog>
           </div>

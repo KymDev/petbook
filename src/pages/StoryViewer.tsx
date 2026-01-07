@@ -136,7 +136,21 @@ export default function StoryViewer() {
       setCurrentIndex(index >= 0 ? index : 0);
     }
 
-    if (currentPet && currentPet.id !== storyData.pet_id) {
+    const { data: profileData } = await supabase
+      .from("user_profiles")
+      .select("account_type")
+      .eq("id", supabase.auth.getUser().then(res => res.data.user?.id))
+      .single();
+    
+    const isProfessional = profileData?.account_type === 'professional';
+    const userId = (await supabase.auth.getUser()).data.user?.id;
+
+    if (isProfessional && userId) {
+      await supabase.from("story_views" as any).upsert({
+        story_id: id,
+        viewer_user_id: userId,
+      }, { onConflict: 'story_id,viewer_user_id' });
+    } else if (currentPet && currentPet.id !== storyData.pet_id) {
       await supabase.from("story_views" as any).upsert({
         story_id: id,
         viewer_pet_id: currentPet.id,

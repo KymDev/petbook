@@ -2,7 +2,7 @@ import { UserProfile } from '@/integrations/supabase/userProfilesService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { ProfessionalBadge } from '@/components/ProfessionalBadge';
 import { 
@@ -34,7 +34,7 @@ const serviceTypeConfig: { [key: string]: { label: string, icon: any, color: str
     color: 'bg-blue-500',
     gradient: 'from-blue-500 to-cyan-500'
   },
-  banho_tosa: { 
+  groomer: { 
     label: 'Banho & Tosa', 
     icon: Scissors, 
     color: 'bg-pink-500',
@@ -46,23 +46,35 @@ const serviceTypeConfig: { [key: string]: { label: string, icon: any, color: str
     color: 'bg-green-500',
     gradient: 'from-green-500 to-emerald-500'
   },
-  loja: { 
-    label: 'Loja Pet', 
-    icon: ShoppingBag, 
+  adestrador: { 
+    label: 'Adestrador', 
+    icon: Award, 
     color: 'bg-purple-500',
     gradient: 'from-purple-500 to-violet-500'
   },
-  hotel: { 
-    label: 'Hotel Pet', 
+  pet_sitter: { 
+    label: 'Pet Sitter', 
     icon: Hotel, 
     color: 'bg-orange-500',
     gradient: 'from-orange-500 to-amber-500'
   },
+  fotografo: { 
+    label: 'Fotógrafo', 
+    icon: ShoppingBag, 
+    color: 'bg-indigo-500',
+    gradient: 'from-indigo-500 to-blue-500'
+  },
+  outros: { 
+    label: 'Serviços', 
+    icon: ShoppingBag, 
+    color: 'bg-gray-500',
+    gradient: 'from-gray-500 to-slate-500'
+  },
 };
 
 const ProfessionalProfileCard: React.FC<ProfessionalProfileCardProps> = ({ profile }) => {
-  const serviceType = profile.professional_service_type || 'veterinario'; // Fallback
-  const config = serviceTypeConfig[serviceType] || serviceTypeConfig.veterinario;
+  const serviceType = profile.professional_service_type || 'outros'; // Fallback
+  const config = serviceTypeConfig[serviceType] || serviceTypeConfig.outros;
   const Icon = config.icon;
   const isHealthProfessional = serviceType === 'veterinario';
 
@@ -92,8 +104,9 @@ const ProfessionalProfileCard: React.FC<ProfessionalProfileCardProps> = ({ profi
       <div className={`h-24 bg-gradient-to-r ${config.gradient} relative`}>
         <div className="absolute -bottom-8 left-6">
           <Avatar className="h-16 w-16 border-4 border-white shadow-lg">
+            <AvatarImage src={profile.professional_avatar_url || undefined} className="object-cover" />
             <AvatarFallback className={`${config.color} text-white text-2xl font-bold`}>
-              <Icon className="h-8 w-8" />
+              {profile.full_name?.[0] || <Icon className="h-8 w-8" />}
             </AvatarFallback>
           </Avatar>
         </div>
@@ -167,14 +180,13 @@ const ProfessionalProfileCard: React.FC<ProfessionalProfileCardProps> = ({ profi
 
         {/* Ações */}
         <div className="flex gap-2 pt-2">
-          {/* Botão de Chat */}
-          <Link to={`/chat/professional/${profile.id}`} className="flex-1">
+          {/* Botão Ver Perfil */}
+          <Link to={`/professional/${profile.id}`} className="flex-1">
             <Button 
               className="w-full gradient-bg"
               size="sm"
             >
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Chat
+              Ver Perfil
             </Button>
           </Link>
 

@@ -170,7 +170,7 @@ const ProfessionalDashboard = () => {
               <Calendar className="h-4 w-4 mr-2" />
               Agenda
             </Button>
-            <Link to="/professional/profile">
+            <Link to="/professional-profile">
               <Button size="sm">Ver Perfil Público</Button>
             </Link>
           </div>

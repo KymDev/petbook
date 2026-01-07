@@ -44,7 +44,7 @@ const Feed = () => {
     } else {
       setLoading(false);
     }
-  }, [currentPet, petLoading, authLoading, profileLoading, profile]);
+  }, [currentPet?.id, petLoading, authLoading, profileLoading, profile?.account_type]);
 
   const fetchFeedPosts = async () => {
     if (!currentPet) {

@@ -10,6 +10,7 @@ interface AvatarUploadProps {
   onUploadSuccess: (newUrl: string) => void;
   bucketPath: string; // Ex: 'professional_avatars/user_id.jpg'
   fallbackText: string;
+  bucketName?: string;
 }
 
 export function AvatarUpload({
@@ -17,6 +18,7 @@ export function AvatarUpload({
   onUploadSuccess,
   bucketPath,
   fallbackText,
+  bucketName,
 }: AvatarUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +34,7 @@ export function AvatarUpload({
 
     setIsUploading(true);
     try {
-      const { publicUrl, error } = await uploadFile(file, bucketPath);
+      const { publicUrl, error } = await uploadFile(file, bucketPath, bucketName);
 
       if (error) {
         throw new Error(error.message || "Erro desconhecido ao fazer upload.");

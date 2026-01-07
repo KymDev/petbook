@@ -6,7 +6,7 @@ export type AccountType = 'user' | 'professional';
 
 export interface UserProfile {
   id: string;
-  account_type: AccountType;
+  account_type: AccountType | null;
   is_professional_verified: boolean;
   professional_bio?: string;
   professional_specialties?: string[];
@@ -32,7 +32,7 @@ interface UserProfileContextType {
   profile: UserProfile | null;
   loading: boolean;
   switchAccountType: (type: AccountType) => Promise<void>;
-  updateProfessionalProfile: (data: Partial<UserProfile>) => Promise<void>;
+  updateProfessionalProfile: (data: any) => Promise<void>;
   refreshProfile: () => Promise<void>;
   setAccountType: (type: AccountType) => Promise<void>;
   isProfileComplete: boolean;
@@ -46,12 +46,32 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
 
-  const fetchProfile = async () => {
+  const checkCompleteness = (p: UserProfile) => {
+    if (p.account_type !== 'professional') return false;
+    
+    const requiredFields = [
+      p.professional_service_type,
+      p.professional_bio,
+      p.professional_phone,
+      p.professional_address,
+      p.professional_city,
+      p.professional_state,
+      p.professional_zip,
+    ];
+    
+    const isServiceTypeValid = p.professional_service_type && (p.professional_service_type !== 'outros' || (p.professional_service_type === 'outros' && p.professional_custom_service_type));
+    const hasSpecialties = p.professional_specialties && p.professional_specialties.length > 0;
+    
+    const isVet = p.professional_service_type === 'veterinario';
+    const hasCrmv = !isVet || (p.professional_crmv && p.professional_crmv_state);
+    
+    return requiredFields.every(field => !!field) && isServiceTypeValid && hasSpecialties && hasCrmv;
+  };
 
+  const fetchProfile = async () => {
     if (!user) {
       setProfile(null);
       setLoading(false);
-
       return;
     }
 
@@ -62,75 +82,38 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         .eq("id", user.id)
         .single();
 
-            if (data && !data.account_type) {
-        // Se o perfil existe, mas não tem account_type, verificar se tem pets
-        const { data: pets } = await supabase
-          .from('pets')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
-
-        if (pets && pets.length > 0) {
-          // Se tem pets, definir como 'user' e atualizar o perfil
-          const { data: updatedProfile, error: updateError } = await supabase
-            .from('user_profiles')
-            .update({ account_type: 'user' })
-            .eq('id', user.id)
-            .select()
-            .single();
-
-          if (updateError) throw updateError;
-          setProfile(updatedProfile as UserProfile);
-        } else {
-          setProfile(data as UserProfile);
-        }
-      } else if (error) {
-        // Se o perfil não existir, criar um
+      if (error) {
         if (error.code === 'PGRST116') {
-
           const { data: newProfile, error: insertError } = await supabase
             .from("user_profiles")
-            .insert({ id: user.id, account_type: 'user' })
+            .insert({ id: user.id, account_type: 'user' }) 
             .select()
             .single();
 
-          if (insertError) throw insertError;
-          setProfile(newProfile as UserProfile);
-
+          if (insertError) {
+             const { data: retryProfile, error: retryError } = await supabase
+                .from("user_profiles")
+                .insert({ id: user.id })
+                .select()
+                .single();
+             
+             if (retryError) throw retryError;
+             setProfile(retryProfile as any);
+          } else {
+            setProfile(newProfile as any);
+          }
+          setIsProfileComplete(false);
         } else {
           throw error;
         }
       } else {
-        setProfile(data as UserProfile);
-        // Verificar se o perfil profissional está completo
-        if (data.account_type === 'professional') {
-          const checkCompleteness = (p: UserProfile) => {
-            const requiredFields = [
-              p.professional_service_type,
-              p.professional_bio,
-              p.professional_phone,
-              p.professional_address,
-              p.professional_city,
-              p.professional_state,
-              p.professional_zip,
-            ];
-            const isServiceTypeValid = p.professional_service_type && (p.professional_service_type !== 'outros' || (p.professional_service_type === 'outros' && p.professional_custom_service_type));
-            const hasSpecialties = p.professional_specialties && p.professional_specialties.length > 0;
-            
-            // Se for veterinário, CRMV e Estado do CRMV são obrigatórios para ser "completo"
-            const isVet = p.professional_service_type === 'veterinario';
-            const hasCrmv = !isVet || (p.professional_crmv && p.professional_crmv_state);
-            
-            return requiredFields.every(field => !!field) && isServiceTypeValid && hasSpecialties && hasCrmv;
-          };
-          setIsProfileComplete(checkCompleteness(data as UserProfile));
-        }
+        setProfile(data as any);
+        setIsProfileComplete(checkCompleteness(data as any));
       }
     } catch (error) {
       console.error("Error fetching user profile:", error);
     } finally {
       setLoading(false);
-
     }
   };
 
@@ -147,7 +130,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         .eq("id", user.id);
       if (error) throw error;
       
-      // Atualizar estado local e recarregar
       await fetchProfile();
     } catch (error) {
       console.error("Error switching account type:", error);
@@ -155,19 +137,28 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updateProfessionalProfile = async (data: Partial<UserProfile>) => {
+  const updateProfessionalProfile = async (data: any) => {
     if (!user) return;
 
     try {
+      // Garantir que o account_type seja professional ao atualizar o perfil profissional
+      const updateData = { 
+        ...data, 
+        account_type: 'professional',
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabase
         .from("user_profiles")
-        .update(data)
+        .update(updateData)
         .eq("id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase update error:", error);
+        throw error;
+      }
 
-      // Atualizar estado local
-      setProfile(prev => prev ? { ...prev, ...data } : null);
+      await fetchProfile();
     } catch (error) {
       console.error("Error updating professional profile:", error);
       throw error;
@@ -178,7 +169,6 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     await fetchProfile();
   };
   
-  // Função para ser chamada pelo RootRedirect/ProtectedRoute para definir o account_type
   const setAccountType = async (type: AccountType) => {
     if (!user) return;
     
@@ -190,9 +180,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         
       if (error) throw error;
       
-      // Atualizar estado local e recarregar
-      setProfile(prev => prev ? { ...prev, account_type: type } : null);
-      await refreshProfile();
+      await fetchProfile();
     } catch (error) {
       console.error("Error setting account type:", error);
       throw error;

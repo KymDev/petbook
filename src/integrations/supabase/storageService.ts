@@ -1,6 +1,6 @@
 import { supabase } from './client';
 
-const BUCKET_NAME = 'avatars';
+const BUCKET_NAME = 'petbook-media';
 
 /**
  * Faz o upload de um arquivo para o Supabase Storage.
@@ -8,9 +8,9 @@ const BUCKET_NAME = 'avatars';
  * @param path O caminho onde o arquivo será salvo no bucket.
  * @returns A URL pública do arquivo ou um erro.
  */
-export async function uploadFile(file: File, path: string): Promise<{ publicUrl: string | null; error: any }> {
+export async function uploadFile(file: File, path: string, bucketName: string = BUCKET_NAME): Promise<{ publicUrl: string | null; error: any }> {
   const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .upload(path, file, {
       cacheControl: '3600',
       upsert: true,
@@ -23,7 +23,7 @@ export async function uploadFile(file: File, path: string): Promise<{ publicUrl:
 
   // Obter a URL pública
   const { data: publicUrlData } = supabase.storage
-    .from(BUCKET_NAME)
+    .from(bucketName)
     .getPublicUrl(data.path);
 
   return { publicUrl: publicUrlData.publicUrl, error: null };

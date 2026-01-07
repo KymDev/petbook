@@ -29,20 +29,16 @@ import CreateStory from "./pages/CreateStory";
 import SignupChoice from "./pages/SignupChoice";
 import ProfessionalSignup from "./pages/ProfessionalSignup";
 import ProfessionalDashboard from "./pages/ProfessionalDashboard";
-import EditPet from "./pages/EditPet"; // Importar o novo componente
+import ProfessionalPublicProfile from "./pages/ProfessionalPublicProfile";
+import EditPet from "./pages/EditPet";
 
-// NOVO: Importação do componente de Registros de Saúde
 import HealthRecordsPage from "./components/HealthRecords/HealthRecordsPage";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "./integrations/supabase/client";
-import { Database } from "./integrations/supabase/types";
 
-// --- Componente Wrapper para Registros de Saúde ---
-// Este componente extrai o petId da URL e busca o nome do pet para passar ao HealthRecordsPage
 const HealthRecordsWrapper = () => {
   const { petId } = useParams<{ petId: string }>();
 
-  // Busca o nome do pet usando o petId
   const { data: pet, isLoading } = useQuery({
     queryKey: ['petName', petId],
     queryFn: async () => {
@@ -60,92 +56,76 @@ const HealthRecordsWrapper = () => {
   });
 
   if (isLoading) return <LoadingPage />;
-  if (!petId || !pet) return <NotFound />; // Se o petId não existir ou o pet não for encontrado
+  if (!petId || !pet) return <NotFound />;
 
   return <HealthRecordsPage petId={petId} petName={pet.name} />;
 };
 
-
-// --- Componente de redirecionamento raiz ---
 const RootRedirect = () => {
   const { user, loading: authLoading } = useAuth();
   const { myPets, loading: petLoading } = usePet();
-  const { profile, loading: profileLoading } = useUserProfile();
+  const { profile, loading: profileLoading, isProfileComplete } = useUserProfile();
 
   if (authLoading || petLoading || profileLoading) return <LoadingPage />;
 
   if (!user) return <Navigate to="/auth" replace />;
-
-  // CORREÇÃO DA RACE CONDITION: Se o usuário está logado, mas o perfil ainda é null,
-  // significa que o carregamento assíncrono do perfil ainda não terminou (ou falhou).
-  // O UserProfileContext garante que um perfil seja criado, então esperamos o objeto 'profile' existir.
   if (!profile) return <LoadingPage />;
 
-  // Se o tipo de conta não foi definido, ir para signup-choice.
-  if (!profile.account_type) {
+  // LÓGICA CRÍTICA: Se o usuário não tem pets E não escolheu ser profissional explicitamente,
+  // ele deve cair na tela de escolha (SignupChoice).
+  // Isso resolve o problema de cair direto em CreatePet.
+  
+  const hasPets = myPets && myPets.length > 0;
+  const isProfessional = profile.account_type === 'professional';
+  
+  // Se não tem pet e não é profissional (ou o account_type ainda é o default 'user' mas sem pets)
+  if (!hasPets && !isProfessional) {
+    // Se o perfil foi recém criado ou o usuário nunca tomou uma decisão, vai para escolha
     return <Navigate to="/signup-choice" replace />;
   }
 
-  // Lógica de Redirecionamento Pós-Login
-  if (profile.account_type === 'professional') {
-    // Se for profissional e o perfil estiver completo, vai para o dashboard
-    if (profile.professional_bio) {
+  // Se é profissional
+  if (isProfessional) {
+    if (isProfileComplete) {
       return <Navigate to="/professional-dashboard" replace />;
     }
-    // Se não estiver completo, vai para o signup profissional
     return <Navigate to="/professional-signup" replace />;
   }
 
-  if (profile.account_type === 'user') {
-    // Se é guardião e tem pet, vai para o feed
-    if (myPets.length > 0) {
-      return <Navigate to="/feed" replace />;
-    }
-    // Se é guardião e não tem pet, vai para criar pet
-    return <Navigate to="/create-pet" replace />;
+  // Se é guardião com pets
+  if (hasPets) {
+    return <Navigate to="/feed" replace />;
   }
 
-  // Fallback (não deve acontecer se o account_type estiver definido)
   return <Navigate to="/signup-choice" replace />;
 };
 
 const queryClient = new QueryClient();
 
-// --- Componente de rota protegida (requer autenticação) ---
 const AuthRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading: authLoading } = useAuth();
-
   if (authLoading) return <LoadingPage />;
-
   if (!user) return <Navigate to="/auth" replace />;
-
   return children;
 };
 
-// --- Componente de rota protegida (requer autenticação + pet) ---
 const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
   const { user, loading: authLoading } = useAuth();
   const { myPets, loading: petLoading } = usePet();
   const { profile, loading: profileLoading } = useUserProfile();
 
   if (authLoading || petLoading || profileLoading) return <LoadingPage />;
-
   if (!user) return <Navigate to="/auth" replace />;
 
-  // Se não escolheu tipo de conta, ir para signup-choice
-  if (!profile || !profile.account_type) {
-    // Se o usuário está logado, mas o perfil ainda não carregou ou o account_type não está definido,
-    // o RootRedirect deve ter tratado o caso inicial. Se chegamos aqui, algo está errado.
-    // Vamos redirecionar para a escolha de conta, onde o usuário pode forçar a definição.
+  const isProfessional = profile?.account_type === 'professional';
+  const hasPets = myPets && myPets.length > 0;
+  const isCreatePetPage = window.location.pathname.includes('/create-pet');
+  const isSignupChoicePage = window.location.pathname.includes('/signup-choice');
+  const isProfessionalSignupPage = window.location.pathname.includes('/professional-signup');
+
+  // Se não tem pet e não é profissional, e não está em uma página de "setup", redireciona
+  if (!hasPets && !isProfessional && !isCreatePetPage && !isSignupChoicePage && !isProfessionalSignupPage) {
     return <Navigate to="/signup-choice" replace />;
-  }
-
-  // Se é profissional, pode acessar qualquer rota
-  if (profile.account_type === 'professional') return children;
-
-  // Se é guardião e não tem pet, e não está na página de criar pet, ir para create-pet
-  if (myPets.length === 0 && window.location.pathname !== '/create-pet') {
-    return <Navigate to="/create-pet" replace />;
   }
 
   return children;
@@ -153,13 +133,11 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 
 const AppRoutes = () => (
   <Routes>
-    {/* Auth */}
     <Route path="/auth" element={<Auth />} />
     <Route path="/auth/confirm" element={<AuthConfirm />} />
     <Route path="/signup-choice" element={<AuthRoute><SignupChoice /></AuthRoute>} />
     <Route path="/professional-signup" element={<AuthRoute><ProfessionalSignup /></AuthRoute>} />
 
-    {/* NOVA ROTA: Diretório de Serviços */}
     <Route
       path="/services"
       element={
@@ -169,7 +147,6 @@ const AppRoutes = () => (
       }
     />
 
-    {/* NOVA ROTA: Perfil Profissional */}
     <Route
       path="/professional-profile"
       element={
@@ -179,7 +156,6 @@ const AppRoutes = () => (
       }
     />
 
-    {/* NOVA ROTA: Painel de Atendimento Profissional */}
     <Route
       path="/professional-dashboard"
       element={
@@ -189,7 +165,15 @@ const AppRoutes = () => (
       }
     />
 
-    {/* Criação inicial de pet */}
+    <Route
+      path="/professional/:userId"
+      element={
+        <ProtectedRoute>
+          <ProfessionalPublicProfile />
+        </ProtectedRoute>
+      }
+    />
+
     <Route
       path="/create-pet"
       element={
@@ -199,7 +183,6 @@ const AppRoutes = () => (
       }
     />
 
-    {/* App interno protegido */}
     <Route
       path="/feed"
       element={
@@ -232,26 +215,24 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
-	    <Route
-	      path="/pet/:petId" // Alterado de /pet/:id para /pet/:petId para consistência com o novo HealthRecordsWrapper
-	      element={
-	        <ProtectedRoute>
-	          <PetProfile />
-	        </ProtectedRoute>
-	      }
-	    />
-	    
-	    {/* NOVA ROTA: Edição de Pet */}
-	    <Route
-	      path="/edit-pet/:petId"
-	      element={
-	        <ProtectedRoute>
-	          <EditPet />
-	        </ProtectedRoute>
-	      }
-	    />
+    <Route
+      path="/pet/:petId"
+      element={
+        <ProtectedRoute>
+          <PetProfile />
+        </ProtectedRoute>
+      }
+    />
     
-    {/* NOVA ROTA: Registros de Saúde */}
+    <Route
+      path="/edit-pet/:petId"
+      element={
+        <ProtectedRoute>
+          <EditPet />
+        </ProtectedRoute>
+      }
+    />
+    
     <Route
       path="/pets/:petId/saude"
       element={
@@ -318,10 +299,7 @@ const AppRoutes = () => (
       }
     />
 
-    {/* Redirecionamento raiz */}
     <Route path="/" element={<RootRedirect />} />
-
-    {/* Not found */}
     <Route path="*" element={<NotFound />} />
   </Routes>
 );

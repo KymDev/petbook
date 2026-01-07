@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { usePet } from "@/contexts/PetContext";
 import { useUserProfile } from "@/contexts/UserProfileContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,6 +29,7 @@ interface Story {
 export const StoriesBar = () => {
   const { currentPet, myPets } = usePet();
   const { profile } = useUserProfile();
+  const { user } = useAuth();
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +37,7 @@ export const StoriesBar = () => {
     fetchStories();
     const interval = setInterval(fetchStories, 60000);
     return () => clearInterval(interval);
-  }, [currentPet, myPets, profile]);
+  }, [currentPet?.id, myPets.length, profile?.account_type]);
 
   const fetchStories = async () => {
     const isProfessional = profile?.account_type === 'professional';
@@ -86,11 +88,13 @@ export const StoriesBar = () => {
       const uniqueStories = Object.values(latestStoriesByPet);
 
       let viewedStoryIds = new Set<string>();
-      if (currentPet) {
+      const viewerId = isProfessional ? user?.id : currentPet?.id;
+      
+      if (viewerId) {
         const { data: viewsData } = await supabase
           .from("story_views" as any)
           .select("story_id")
-          .eq("viewer_pet_id", currentPet.id)
+          .eq(isProfessional ? "viewer_user_id" : "viewer_pet_id", viewerId)
           .in("story_id", uniqueStories.map(s => s.id));
 
         viewedStoryIds = new Set((viewsData as any[])?.map(v => v.story_id) || []);

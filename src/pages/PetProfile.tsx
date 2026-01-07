@@ -14,7 +14,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { HealthAccessButton } from "@/components/pet/HealthAccessButton";
-import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle, Stethoscope, Settings } from "lucide-react";
+import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle, Stethoscope, Settings, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface Post {
   id: string;
@@ -239,6 +240,7 @@ const PetProfile = () => {
   }
 
   const isOwnPet = currentPet?.id === pet.id;
+  const isFamily = user && pet.user_id === user.id;
 
   return (
     <MainLayout>
@@ -255,7 +257,15 @@ const PetProfile = () => {
             </Avatar>
 
             <div className="text-center mt-4 space-y-2">
-              <h1 className="text-2xl font-heading font-bold">{pet.name}</h1>
+              <div className="flex items-center justify-center gap-2">
+                <h1 className="text-2xl font-heading font-bold">{pet.name}</h1>
+                {isFamily && (
+                  <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-none">
+                    <Users className="h-3 w-3 mr-1" />
+                    Família
+                  </Badge>
+                )}
+              </div>
               <div className="flex flex-wrap justify-center gap-2 mt-2">
                 {badges.map((badge) => (
                   <BadgeDisplay key={badge.id} badgeType={badge.badge_type} />
@@ -298,7 +308,7 @@ const PetProfile = () => {
                 </>
               ) : (
                 <>
-                  {(currentPet || isProfessional) && (
+                  {(currentPet || isProfessional) && !isFamily && (
                     <Button
                       onClick={handleFollow}
                       variant={isFollowing ? "outline" : "default"}
@@ -327,7 +337,7 @@ const PetProfile = () => {
                     </Link>
                   )}
 
-                  {currentPet && (
+                  {currentPet && !isFamily && (
                     <>
                       <Button variant="outline" onClick={() => handleInteraction("abraco")} className="gap-2">
                         <Heart className="h-4 w-4 text-secondary" /> Abraço

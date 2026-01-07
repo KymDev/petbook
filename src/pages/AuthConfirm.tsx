@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PetBookLogo } from "@/components/PetBookLogo";
-import { Mail, ArrowLeft, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { Mail, ArrowLeft, Loader2, CheckCircle, AlertCircle, LogIn } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const AuthConfirm = () => {
-  const { user, loading, resendConfirmationEmail } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [resending, setResending] = useState(false);
   const [changingEmail, setChangingEmail] = useState(false);
@@ -25,16 +26,36 @@ const AuthConfirm = () => {
   }, [user, loading, navigate]);
 
   const handleResendEmail = async () => {
-    if (!user?.email) return;
+    // Se o usuário não estiver logado (sessão expirou ou limpou cache), redireciona para login
+    if (!user?.email) {
+      toast.error("Sessão expirada. Por favor, faça login novamente.");
+      navigate("/auth");
+      return;
+    }
 
     setResending(true);
     try {
-      await resendConfirmationEmail(user.email);
+      // Usando o supabase diretamente se a função não estiver no context
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: user.email,
+      });
+      
+      if (error) throw error;
       toast.success("Email de confirmação reenviado!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao reenviar email");
     } finally {
       setResending(false);
+    }
+  };
+
+  const handleBackToLogin = async () => {
+    try {
+      await signOut();
+      navigate("/auth");
+    } catch (error) {
+      navigate("/auth");
     }
   };
 
@@ -163,6 +184,16 @@ const AuthConfirm = () => {
                     Reenviar Email de Confirmação
                   </>
                 )}
+              </Button>
+
+              {/* Login Button */}
+              <Button
+                onClick={handleBackToLogin}
+                variant="default"
+                className="w-full gradient-bg"
+              >
+                <LogIn className="w-4 h-4 mr-2" />
+                Já confirmei, ir para Login
               </Button>
 
               {/* Change Email Section */}
