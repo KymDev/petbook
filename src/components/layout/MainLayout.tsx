@@ -42,6 +42,7 @@ import {
   Trash2,
   UserCircle,
   ChevronRight,
+  HeartPulse,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -59,7 +60,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const { toast } = useToast();
   const [unreadCount, setUnreadCount] = useState(0);
   
-  // Estados para modais de exclusão
   const [isDeleteAccountOpen, setIsDeleteAccountOpen] = useState(false);
   const [isDeletePetOpen, setIsDeletePetOpen] = useState(false);
   const [petToDelete, setPetToDelete] = useState<Pet | null>(null);
@@ -180,16 +180,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     }
   };
 
-  // Itens de navegação para Desktop
-  const desktopNavItems = [
-    { href: "/feed", icon: Home, label: "Feed" },
-    { href: "/explore", icon: Search, label: "Explorar" },
-    { href: "/services", icon: Stethoscope, label: "Serviços" },
-    { href: "/chat", icon: MessageCircle, label: "Chat" },
-  ];
-
-  // Itens de navegação para Mobile (Barra Inferior)
-  // Ordem solicitada: Feed, Mensagem (Chat), Criar Posts, Explorar, Serviços
   const mobileNavItems = [
     { href: "/feed", icon: Home, label: "Feed" },
     { href: "/chat", icon: MessageCircle, label: "Mensagens" },
@@ -200,30 +190,69 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      {/* Top Header */}
       <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur-lg">
         <div className="container flex h-full items-center justify-between px-4 max-w-6xl mx-auto">
+          {/* Logo */}
           <Link to="/feed" className="flex-shrink-0">
             <PetBookLogo size="sm" />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-4">
-            {desktopNavItems.map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <Link key={item.href} to={item.href} className={cn(
-                  "flex items-center gap-2 px-2 py-1 rounded-md transition-colors hover:bg-accent",
-                  isActive ? "text-primary font-bold" : "text-muted-foreground"
-                )}>
-                  <item.icon className="h-5 w-5" />
-                  <span className="hidden lg:inline text-sm">{item.label}</span>
-                </Link>
-              );
-            })}
+          {/* Navegação Centralizada */}
+          <nav className="hidden md:flex items-center gap-2 lg:gap-4 absolute left-1/2 -translate-x-1/2">
+            {/* Home */}
+            <Link to="/feed" className={cn(
+              "p-2 rounded-md transition-colors hover:bg-accent",
+              location.pathname === "/feed" ? "text-primary" : "text-muted-foreground"
+            )}>
+              <Home className="h-6 w-6" />
+            </Link>
+
+            {/* Lupa (Explorar) */}
+            <Link to="/explore" className={cn(
+              "p-2 rounded-md transition-colors hover:bg-accent",
+              location.pathname === "/explore" ? "text-primary" : "text-muted-foreground"
+            )}>
+              <Search className="h-6 w-6" />
+            </Link>
+
+            {/* Saúde do Pet (Destaque Central) */}
+            {currentPet && (
+              <Button 
+                onClick={() => navigate(`/pet/${currentPet.id}/health`)}
+                className="mx-2 gap-2 bg-red-500 hover:bg-red-600 text-white border-none shadow-md h-9 px-4 rounded-full font-bold transition-all hover:scale-105"
+              >
+                <HeartPulse className="h-5 w-5 animate-pulse" />
+                <span className="hidden lg:inline text-sm">Saúde</span>
+              </Button>
+            )}
+
+            {/* Serviços */}
+            <Link to="/services" className={cn(
+              "p-2 rounded-md transition-colors hover:bg-accent",
+              location.pathname === "/services" ? "text-primary" : "text-muted-foreground"
+            )}>
+              <Stethoscope className="h-6 w-6" />
+            </Link>
+
+            {/* Chat */}
+            <Link to="/chat" className={cn(
+              "p-2 rounded-md transition-colors hover:bg-accent",
+              location.pathname === "/chat" ? "text-primary" : "text-muted-foreground"
+            )}>
+              <MessageCircle className="h-6 w-6" />
+            </Link>
           </nav>
 
-          <div className="flex items-center gap-1 md:gap-3">
-            {/* Notificações com ícone de Patinha */}
+          {/* Ações da Direita */}
+          <div className="flex items-center gap-1 md:gap-2">
+            {/* Botão de Novo Post (+) */}
+            {!isProfessional && (
+              <Link to="/create-post" className="p-2 text-muted-foreground hover:text-primary transition-colors">
+                <PlusCircle className="h-6 w-6" />
+              </Link>
+            )}
+
+            {/* Notificações */}
             <Link to="/notifications" className="relative p-2 text-muted-foreground hover:text-primary transition-colors">
               <PawPrint className={cn("h-6 w-6", location.pathname === "/notifications" && "text-primary")} />
               {unreadCount > 0 && (
@@ -233,7 +262,62 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               )}
             </Link>
 
-            {/* Menu de Configurações (Engrenagem) */}
+            {/* Foto do Pet */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 border border-border hover:ring-2 ring-primary/20 transition-all cursor-pointer ml-1">
+                  {isProfessional ? (
+                    <>
+                      <AvatarImage src={profile?.professional_avatar_url || undefined} />
+                      <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                        {profile?.full_name?.[0] || <Briefcase className="h-4 w-4" />}
+                      </AvatarFallback>
+                    </>
+                  ) : currentPet ? (
+                    <>
+                      <AvatarImage src={currentPet.avatar_url || undefined} />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                        {currentPet.name[0]}
+                      </AvatarFallback>
+                    </>
+                  ) : (
+                    <AvatarFallback className="bg-muted text-muted-foreground text-xs">
+                      <UserIcon className="h-4 w-4" />
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>
+                  {isProfessional ? profile?.full_name : (currentPet?.name || "Seu Perfil")}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to={isProfessional ? "/professional-profile" : (currentPet ? `/pet/${currentPet.id}` : "/create-pet")} className="flex items-center gap-2">
+                    <UserCircle className="h-4 w-4" />
+                    Ver Perfil
+                  </Link>
+                </DropdownMenuItem>
+                
+                {!isProfessional && myPets.length > 1 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">Seus outros pets</DropdownMenuLabel>
+                    {myPets.filter(p => p.id !== currentPet?.id).map(pet => (
+                      <DropdownMenuItem key={pet.id} onClick={() => selectPet(pet)} className="flex items-center gap-3">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={pet.avatar_url || undefined} />
+                          <AvatarFallback className="text-[10px]">{pet.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <span>{pet.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Engrenagem (Por Último) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
@@ -264,7 +348,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 )}
                 <DropdownMenuSeparator />
                 
-                {/* Opções de Gerenciamento de Pets (Apenas Modo Guardião) */}
                 {!isProfessional && (
                   <>
                     <DropdownMenuItem asChild>
@@ -320,67 +403,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Menu do Pet / Perfil */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Avatar className="h-8 w-8 border border-border hover:ring-2 ring-primary/20 transition-all cursor-pointer">
-                  {isProfessional ? (
-                    <>
-                      <AvatarImage src={profile?.professional_avatar_url || undefined} />
-                      <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                        {profile?.full_name?.[0] || <Briefcase className="h-4 w-4" />}
-                      </AvatarFallback>
-                    </>
-                  ) : currentPet ? (
-                    <>
-                      <AvatarImage src={currentPet.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                        {currentPet.name[0]}
-                      </AvatarFallback>
-                    </>
-                  ) : (
-                    <AvatarFallback className="bg-muted text-muted-foreground text-xs">
-                      <UserIcon className="h-4 w-4" />
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuLabel>
-                  {isProfessional ? profile?.full_name : (currentPet?.name || "Seu Perfil")}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to={isProfessional ? "/professional-profile" : (currentPet ? `/pet/${currentPet.id}` : "/create-pet")} className="flex items-center gap-2">
-                    <UserCircle className="h-4 w-4" />
-                    Ver Perfil
-                  </Link>
-                </DropdownMenuItem>
-                
-                {/* Lista de outros pets para trocar */}
-                {!isProfessional && myPets.length > 1 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">Seus outros pets</DropdownMenuLabel>
-                    {myPets.filter(p => p.id !== currentPet?.id).map(pet => (
-                      <DropdownMenuItem key={pet.id} onClick={() => selectPet(pet)} className="flex items-center gap-3">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={pet.avatar_url || undefined} />
-                          <AvatarFallback className="text-[10px]">{pet.name[0]}</AvatarFallback>
-                        </Avatar>
-                        <span>{pet.name}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
       </header>
 
-      {/* Modais de Exclusão */}
       <AlertDialog open={isDeleteAccountOpen} onOpenChange={setIsDeleteAccountOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -415,12 +441,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Main Content */}
       <main className="pt-14 min-h-screen max-w-6xl mx-auto">
         {children}
       </main>
 
-      {/* Mobile Bottom Tab Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-background border-t border-border flex items-center justify-around z-50 px-2">
         {mobileNavItems.map((item) => {
           const isActive = location.pathname === item.href;

@@ -9,6 +9,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,8 +18,9 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Info } from 'lucide-react';
+import { CalendarIcon, Info, Scale, AlertTriangle, Pill } from 'lucide-react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Database } from '@/integrations/supabase/types';
 import { createHealthRecord, updateHealthRecord, createPendingHealthRecord } from '@/integrations/supabase/healthRecordsService';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,7 +45,10 @@ const healthRecordSchema = z.object({
   }),
   observation: z.string().max(1000).optional(),
   attachment_url: z.string().url({ message: 'URL de anexo inválida.' }).optional().or(z.literal('')),
-  // Novos campos para anotações contextuais (Profissional)
+  // Novos campos para anotações contextuais
+  weight: z.string().optional(),
+  medication_name: z.string().optional(),
+  allergy_description: z.string().optional(),
   follow_up_notes: z.string().optional(),
   set_reminder: z.boolean().default(false),
   reminder_date: z.date().optional(),
@@ -63,37 +68,56 @@ interface HealthRecordFormProps {
 const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData, onSuccess, onClose, isProfessionalSubmission, professionalId }) => {
   const isEdit = !!initialData;
   const { profile } = useAuth();
-  const isHealthProfessional = profile?.professional_service_type === 'veterinario';
+  
+  // Determinar o nome padrão do profissional
+  const defaultProfessionalName = initialData?.professional_name || 
+                                 (profile?.account_type === 'professional' ? profile?.full_name : '') || 
+                                 '';
 
   const form = useForm<HealthRecordFormValues>({
     resolver: zodResolver(healthRecordSchema),
     defaultValues: {
-      professional_name: initialData?.professional_name || profile?.full_name || '',
+      professional_name: defaultProfessionalName,
       title: initialData?.title || '',
       record_type: initialData?.record_type || 'vacina',
       record_date: initialData?.record_date ? new Date(initialData.record_date) : new Date(),
       observation: initialData?.observation || '',
       attachment_url: initialData?.attachment_url || '',
+      weight: '',
+      medication_name: '',
+      allergy_description: '',
       follow_up_notes: '',
       set_reminder: false,
     },
   });
 
+  const watchType = form.watch('record_type');
+
   const onSubmit = async (values: HealthRecordFormValues) => {
     let result;
+    
+    // Construir a observação final incluindo os novos campos se preenchidos
+    let finalObservation = values.observation || '';
+    
+    if (values.record_type === 'peso' && values.weight) {
+      finalObservation = `Peso: ${values.weight}kg\n${finalObservation}`;
+    } else if (values.record_type === 'medicamento' && values.medication_name) {
+      finalObservation = `Medicamento: ${values.medication_name}\n${finalObservation}`;
+    } else if (values.record_type === 'alergia' && values.allergy_description) {
+      finalObservation = `Alergia: ${values.allergy_description}\n${finalObservation}`;
+    }
 
     if (isProfessionalSubmission && professionalId) {
       // Submissão de Profissional (Registro Pendente)
-      const observationText = values.observation || '';
       const followUpText = values.follow_up_notes ? `\n\n[Acompanhamento Profissional]: ${values.follow_up_notes}` : '';
       
       const pendingRecordData: PendingHealthRecordInsert = {
         pet_id: petId,
         professional_user_id: professionalId,
         record_type: values.record_type,
-        professional_name: values.professional_name || null,
+        professional_name: values.professional_name || profile?.full_name || 'Profissional PetBook',
         record_date: values.record_date.toISOString(),
-        observation: observationText + followUpText || null,
+        observation: finalObservation + followUpText || null,
         attachment_url: values.attachment_url || null,
         status: 'pending',
         title: values.title,
@@ -117,8 +141,8 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
         title: values.title,
         record_type: values.record_type,
         record_date: values.record_date.toISOString(),
-        professional_name: values.professional_name || null,
-        observation: values.observation || null,
+        professional_name: values.professional_name || (profile?.account_type === 'professional' ? profile?.full_name : 'Guardião'),
+        observation: finalObservation || null,
         attachment_url: values.attachment_url || null,
       };
 
@@ -131,7 +155,6 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
       if (result.error) {
         toast.error(`Erro ao ${isEdit ? 'atualizar' : 'criar'} registro: ${result.error.message}`);
       } else {
-        // Se houver lembrete, criar uma notificação agendada (simulada aqui por uma notificação imediata de confirmação)
         if (values.set_reminder && values.reminder_date) {
           await supabase.from('notifications').insert({
             pet_id: petId,
@@ -172,15 +195,134 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
           </div>
         )}
 
-        {(isProfessionalSubmission || isEdit) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
-            name="professional_name"
+            name="record_type"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nome do Profissional</FormLabel>
+                <FormLabel>Tipo de Registro</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {recordTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="record_date"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel className="mb-2">Data do Registro</FormLabel>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={'outline'}
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !field.value && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Selecione uma data</span>}
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Título / Nome do Procedimento</FormLabel>
+              <FormControl>
+                <Input placeholder="Ex: Vacina V10, Hemograma, Consulta de Rotina" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Campos Dinâmicos baseados no tipo */}
+        {watchType === 'peso' && (
+          <FormField
+            control={form.control}
+            name="weight"
+            render={({ field }) => (
+              <FormItem className="bg-teal-50 p-3 rounded-lg border border-teal-100">
+                <FormLabel className="text-teal-700 flex items-center gap-2">
+                  <Scale className="h-4 w-4" /> Peso Atual (kg)
+                </FormLabel>
                 <FormControl>
-                  <Input placeholder="Seu Nome/Clínica" {...field} disabled={isEdit && !isProfessionalSubmission} />
+                  <Input type="number" step="0.1" placeholder="Ex: 12.5" {...field} />
+                </FormControl>
+                <FormDescription className="text-teal-600/70 text-[10px]">
+                  Este valor atualizará o resumo de saúde do pet.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {watchType === 'medicamento' && (
+          <FormField
+            control={form.control}
+            name="medication_name"
+            render={({ field }) => (
+              <FormItem className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                <FormLabel className="text-purple-700 flex items-center gap-2">
+                  <Pill className="h-4 w-4" /> Nome do Medicamento
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="Ex: Apoquel 5.4mg" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {watchType === 'alergia' && (
+          <FormField
+            control={form.control}
+            name="allergy_description"
+            render={({ field }) => (
+              <FormItem className="bg-red-50 p-3 rounded-lg border border-red-100">
+                <FormLabel className="text-red-700 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" /> Descrição da Alergia
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="Ex: Alergia a frango, Picada de abelha" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -190,74 +332,16 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
 
         <FormField
           control={form.control}
-          name="title"
+          name="professional_name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Título</FormLabel>
+              <FormLabel>Profissional / Clínica Responsável</FormLabel>
               <FormControl>
-                <Input placeholder="Ex: Vacina V8 Anual" {...field} />
+                <Input placeholder="Nome do Veterinário ou Clínica" {...field} />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="record_type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tipo de Registro</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {recordTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="record_date"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Data do Registro</FormLabel>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <FormControl>
-                    <Button
-                      variant={'outline'}
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !field.value && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(field.value, 'PPP', { locale: ptBR }) : <span>Selecione uma data</span>}
-                    </Button>
-                  </FormControl>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={field.value}
-                    onSelect={field.onChange}
-                    disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <FormDescription className="text-[10px]">
+                Deixe em branco se for um registro feito por você (guardião).
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -268,9 +352,9 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
           name="observation"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Observação / Diagnóstico</FormLabel>
+              <FormLabel>Observações Adicionais</FormLabel>
               <FormControl>
-                <Textarea placeholder="Detalhes importantes sobre o registro..." {...field} />
+                <Textarea placeholder="Detalhes importantes, recomendações ou diagnóstico..." {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -283,10 +367,10 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
             name="follow_up_notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-blue-600">Anotações de Acompanhamento</FormLabel>
+                <FormLabel className="text-blue-600">Anotações de Acompanhamento (Para o Tutor)</FormLabel>
                 <FormControl>
                   <Textarea 
-                    placeholder="O que o tutor deve acompanhar? (Ex: febre, apetite)" 
+                    placeholder="O que o tutor deve acompanhar? (Ex: observar febre, apetite, repouso)" 
                     className="border-blue-200 focus-visible:ring-blue-500"
                     {...field} 
                   />
@@ -297,45 +381,31 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
           />
         )}
 
-        <FormField
-          control={form.control}
-          name="attachment_url"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>URL do Anexo (Opcional)</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: https://storage.supabase.co/..." {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="set_reminder"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-              <div className="space-y-0.5">
-                <FormLabel>Definir Lembrete</FormLabel>
-                <p className="text-xs text-muted-foreground">Notificar sobre o próximo evento (ex: reforço de vacina)</p>
-              </div>
+        <div className="flex items-center justify-between p-3 bg-secondary/20 rounded-lg border border-border/50">
+          <div className="space-y-0.5">
+            <FormLabel>Definir Lembrete</FormLabel>
+            <p className="text-[10px] text-muted-foreground">Notificar sobre este registro no futuro</p>
+          </div>
+          <FormField
+            control={form.control}
+            name="set_reminder"
+            render={({ field }) => (
               <FormControl>
                 <Switch
                   checked={field.value}
                   onCheckedChange={field.onChange}
                 />
               </FormControl>
-            </FormItem>
-          )}
-        />
+            )}
+          />
+        </div>
 
         {form.watch('set_reminder') && (
           <FormField
             control={form.control}
             name="reminder_date"
             render={({ field }) => (
-              <FormItem className="flex flex-col">
+              <FormItem className="flex flex-col animate-in fade-in slide-in-from-top-2">
                 <FormLabel>Data do Lembrete</FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -368,12 +438,14 @@ const HealthRecordForm: React.FC<HealthRecordFormProps> = ({ petId, initialData,
           />
         )}
 
-        <Button type="submit" className="w-full gradient-bg" disabled={form.formState.isSubmitting || (isProfessionalSubmission && !isHealthProfessional)}>
-          {form.formState.isSubmitting ? 'Salvando...' : isProfessionalSubmission ? 'Submeter Ficha para Aprovação' : isEdit ? 'Atualizar Registro' : 'Criar Registro'}
-        </Button>
-        {isProfessionalSubmission && !isHealthProfessional && (
-          <p className="text-sm text-red-500 text-center">Apenas profissionais de saúde podem adicionar fichas de saúde.</p>
-        )}
+        <div className="flex gap-3 pt-4">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" className="flex-1 gradient-bg" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? 'Salvando...' : (isEdit ? 'Atualizar' : 'Salvar Registro')}
+          </Button>
+        </div>
       </form>
     </Form>
   );

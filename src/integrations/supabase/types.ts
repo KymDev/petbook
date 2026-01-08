@@ -316,6 +316,8 @@ export type Database = {
           record_date: string
           record_type: Database["public"]["Enums"]["health_record_type"]
           title: string | null
+          allergies: string | null
+          medications: string | null
         }
         Insert: {
           attachment_url?: string | null
@@ -327,6 +329,8 @@ export type Database = {
           record_date: string
           record_type: Database["public"]["Enums"]["health_record_type"]
           title?: string | null
+          allergies?: string | null
+          medications?: string | null
         }
         Update: {
           attachment_url?: string | null
@@ -338,6 +342,8 @@ export type Database = {
           record_date?: string
           record_type?: Database["public"]["Enums"]["health_record_type"]
           title?: string | null
+          allergies?: string | null
+          medications?: string | null
         }
         Relationships: [
           {

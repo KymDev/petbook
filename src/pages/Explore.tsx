@@ -56,12 +56,14 @@ const Explore = () => {
           avatar_url
         )
       `)
+      .eq("type", "photo")
       .not("media_url", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(100);
 
     if (data) {
-      setPosts(data as any);
+      // Embaralhar os posts localmente para garantir que sejam aleatórios
+      const shuffled = [...data].sort(() => Math.random() - 0.5);
+      setPosts(shuffled.slice(0, 30) as any);
     }
     setLoading(false);
   };

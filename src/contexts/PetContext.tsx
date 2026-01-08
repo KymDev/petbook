@@ -218,7 +218,7 @@ export const PetProvider = ({ children }: { children: ReactNode }) => {
 
     // Se o usuário está logado e o perfil carregou, carrega os pets
     refreshAll();
-  }, [user, profileLoading, profile]); // Adicionado 'profile' como dependência para reagir à troca de conta
+  }, [user?.id, profileLoading, profile?.account_type]); // Dependências mais específicas para evitar loops
 
 
   useEffect(() => {

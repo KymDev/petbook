@@ -12,6 +12,7 @@ import Feed from "./pages/Feed";
 import CreatePet from "./pages/CreatePet";
 import CreatePost from "./pages/CreatePost";
 import PetProfile from "./pages/PetProfile";
+import PetHealth from "./pages/PetHealth";
 import Chat from "./pages/Chat";
 import ChatRoom from "./pages/ChatRoom";
 import Communities from "./pages/Communities";
@@ -220,6 +221,14 @@ const AppRoutes = () => (
       element={
         <ProtectedRoute>
           <PetProfile />
+        </ProtectedRoute>
+      }
+    />
+    <Route
+      path="/pet/:petId/health"
+      element={
+        <ProtectedRoute>
+          <PetHealth />
         </ProtectedRoute>
       }
     />

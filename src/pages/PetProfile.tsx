@@ -14,8 +14,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { HealthAccessButton } from "@/components/pet/HealthAccessButton";
-import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle, Stethoscope, Settings, Users } from "lucide-react";
+import { Heart, PawPrint, Cookie, ExternalLink, UserPlus, UserMinus, MessageCircle, Stethoscope, Settings, Users, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+// Novos componentes integrados
+import { GuardianPetHeader } from "@/components/layout/GuardianPetHeader";
+
 
 interface Post {
   id: string;
@@ -46,6 +50,8 @@ const PetProfile = () => {
   const [followingCount, setFollowingCount] = useState(0);
   const [healthAccessStatus, setHealthAccessStatus] = useState<'none' | 'pending' | 'granted' | 'revoked'>('none');
   const [healthAccessId, setHealthAccessId] = useState<string | null>(null);
+  
+
 
   useEffect(() => {
     if (petId) fetchPetProfile();
@@ -244,8 +250,14 @@ const PetProfile = () => {
 
   return (
     <MainLayout>
+      {/* Header de Saúde no Topo */}
+      <GuardianPetHeader 
+        petName={pet.name} 
+      />
+
       <div className="container max-w-xl py-6 space-y-6">
-        {/* Header */}
+
+        {/* Perfil Principal */}
         <Card className="card-elevated border-0 overflow-hidden">
           <div className="h-24 gradient-bg" />
           <CardContent className="relative pt-0 pb-6">
@@ -293,15 +305,15 @@ const PetProfile = () => {
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-wrap justify-center gap-2 mt-4">
-              {isOwnPet ? (
+            {/* Ações */}
+            <div className="flex flex-wrap justify-center gap-3 mt-6">
+              {isOwnPet || isFamily ? (
                 <>
-                  <Button onClick={() => navigate(`/pets/${petId}/saude`)} className="gap-2">
-                    <Stethoscope className="h-4 w-4" />
-                    Registros de Saúde
+                  <Button onClick={() => navigate(`/pets/${petId}/saude`)} className="gap-2 gradient-bg">
+                    <ClipboardList className="h-4 w-4" />
+                    Prontuário de Saúde
                   </Button>
-                  <Button onClick={() => navigate(`/edit-pet/${petId}`)} variant="outline" className="gap-2">
+                  <Button variant="outline" onClick={() => navigate(`/edit-pet/${petId}`)} className="gap-2">
                     <Settings className="h-4 w-4" />
                     Configurações
                   </Button>

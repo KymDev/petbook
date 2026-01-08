@@ -39,12 +39,12 @@ const Feed = () => {
     
     if (isProfessional) {
       fetchFeedPostsForProfessional();
-    } else if (currentPet) {
+    } else if (currentPet?.id) {
       fetchFeedPosts();
     } else {
       setLoading(false);
     }
-  }, [currentPet?.id, petLoading, authLoading, profileLoading, profile?.account_type]);
+  }, [currentPet?.id, authLoading, petLoading, profileLoading]);
 
   const fetchFeedPosts = async () => {
     if (!currentPet) {

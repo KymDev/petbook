@@ -347,7 +347,8 @@ const HealthRecordsPage: React.FC<HealthRecordsPageProps> = ({
                 <div className="flex items-center gap-2">
                   <Scale className="h-4 w-4 text-teal-500" />
                   <span className="text-sm font-medium">
-                    {records.find(r => r.record_type === 'peso')?.observation?.match(/\d+/)?.[0] || '--'} kg
+                    {records.find(r => r.record_type === 'peso')?.observation?.match(/Peso:\s*(\d+(\.\d+)?)/)?.[1] || 
+                     records.find(r => r.record_type === 'peso')?.observation?.match(/(\d+(\.\d+)?)/)?.[1] || '--'} kg
                   </span>
                 </div>
               </div>
@@ -367,7 +368,9 @@ const HealthRecordsPage: React.FC<HealthRecordsPageProps> = ({
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-red-500" />
                   <span className="text-sm font-medium">
-                    {records.filter(r => r.record_type === 'alergia').length || 'Nenhuma'}
+                    {records.filter(r => r.record_type === 'alergia').length > 0 
+                      ? `${records.filter(r => r.record_type === 'alergia').length} ativa(s)` 
+                      : 'Nenhuma'}
                   </span>
                 </div>
               </div>
@@ -376,7 +379,9 @@ const HealthRecordsPage: React.FC<HealthRecordsPageProps> = ({
                 <div className="flex items-center gap-2">
                   <Pill className="h-4 w-4 text-purple-500" />
                   <span className="text-sm font-medium">
-                    {records.filter(r => r.record_type === 'medicamento').length || 'Nenhum'}
+                    {records.filter(r => r.record_type === 'medicamento').length > 0 
+                      ? `${records.filter(r => r.record_type === 'medicamento').length} em uso` 
+                      : 'Nenhum'}
                   </span>
                 </div>
               </div>
@@ -546,7 +551,7 @@ const HealthRecordsPage: React.FC<HealthRecordsPageProps> = ({
                   <div className="flex flex-wrap gap-4 items-center text-xs">
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <Stethoscope className="h-3 w-3" />
-                      <span>Profissional: {record.professional_name || 'Não informado'}</span>
+                      <span>Responsável: {record.professional_name || 'Guardião'}</span>
                     </div>
                     
                     {record.attachment_url && (

@@ -35,8 +35,6 @@ export const StoriesBar = () => {
 
   useEffect(() => {
     fetchStories();
-    const interval = setInterval(fetchStories, 60000);
-    return () => clearInterval(interval);
   }, [currentPet?.id, myPets.length, profile?.account_type]);
 
   const fetchStories = async () => {
