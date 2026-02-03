@@ -68,6 +68,7 @@
     "delete_error": "Error al eliminar"
   },
   "languages": {
+    "title": "Idioma",
     "pt": "Portugués",
     "en": "Inglés",
     "es": "Español"

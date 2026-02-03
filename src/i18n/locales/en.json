@@ -79,6 +79,7 @@
     "delete_error": "Error deleting"
   },
   "languages": {
+    "title": "Language",
     "pt": "Portuguese",
     "en": "English",
     "es": "Spanish"

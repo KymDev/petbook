@@ -79,6 +79,7 @@
     "delete_error": "Erro ao excluir"
   },
   "languages": {
+    "title": "Idioma",
     "pt": "Português",
     "en": "Inglês",
     "es": "Espanhol"

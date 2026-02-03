@@ -26,7 +26,7 @@ export const GuardianPetHeader: React.FC<GuardianPetHeaderProps> = ({ petName, s
 
   if (!showHealthButton) {
     return (
-      <div className="w-full bg-background/95 backdrop-blur-lg p-3 md:p-4 border-b flex justify-between items-center sticky top-14 z-40">
+      <div className="w-full bg-background/95 backdrop-blur-lg p-3 md:p-4 border-b flex justify-between items-center md:sticky md:top-14 z-40">
         <div className="flex items-center gap-3 overflow-hidden">
           <h1 className="text-lg md:text-xl font-bold text-foreground truncate">{petName}</h1>
         </div>
@@ -35,7 +35,7 @@ export const GuardianPetHeader: React.FC<GuardianPetHeaderProps> = ({ petName, s
   }
 
   return (
-    <div className="w-full bg-background/95 backdrop-blur-lg p-3 md:p-4 border-b flex justify-between items-center sticky top-14 z-40">
+    <div className="w-full bg-background/95 backdrop-blur-lg p-3 md:p-4 border-b flex justify-between items-center md:sticky md:top-14 z-40">
       <div className="flex items-center gap-3 overflow-hidden">
         <h1 className="text-lg md:text-xl font-bold text-foreground truncate">{petName}</h1>
       </div>

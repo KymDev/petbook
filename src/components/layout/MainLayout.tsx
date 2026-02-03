@@ -13,6 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -40,8 +44,7 @@ import {
   Plus,
   Activity,
   PawPrint,
-  ChevronRight,
-  Bell,
+  Languages,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -54,7 +57,7 @@ interface MainLayoutProps {
 }
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const { user, signOut, isAdmin, deleteAccount } = useAuth();
   const { currentPet, myPets, selectPet, deletePet } = usePet();
   const { profile, setAccountType } = useUserProfile();
@@ -69,6 +72,17 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPetListForDeletionOpen, setIsPetListForDeletionOpen] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
+
+  const languages = [
+    { code: 'pt', name: t('languages.pt'), flag: '🇧🇷' },
+    { code: 'en', name: t('languages.en'), flag: '🇺🇸' },
+    { code: 'es', name: t('languages.es'), flag: '🇪🇸' },
+  ];
+
+  const changeLanguage = (lng: string) => {
+    i18n.changeLanguage(lng);
+    localStorage.setItem('i18nextLng', lng);
+  };
 
   useEffect(() => {
     const isProfessional = profile?.account_type === 'professional';
@@ -303,7 +317,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full p-0 overflow-hidden">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-9 w-9">
                     {isProfessional ? (
                       <>
                         <AvatarImage src={profile?.professional_avatar_url || undefined} />
@@ -408,9 +422,34 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
 
       {/* Mobile Header */}
       <header className="fixed top-0 left-0 right-0 z-50 h-12 border-b border-border bg-background/95 backdrop-blur-lg md:hidden flex items-center justify-between px-4">
-        <PetBookLogo size="xs" />
-        <div className="flex items-center gap-2">
-          <LanguageSwitcher />
+        <Link to="/feed" className="flex-shrink-0">
+          <PetBookLogo size="xs" />
+        </Link>
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                <Plus className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>{t("common.create_new")}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link to="/create-post" className="flex items-center gap-2">
+                  <PlusSquare className="h-4 w-4" />
+                  {t("common.new_post")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/create-story" className="flex items-center gap-2">
+                  <PlusCircle className="h-4 w-4" />
+                  {t("common.new_story")}
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Link to="/notifications" className="relative p-2">
             <PawPrint className={cn("h-5 w-5", location.pathname === "/notifications" && "fill-current")} />
             {unreadCount > 0 && (
@@ -419,8 +458,9 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
               </span>
             )}
           </Link>
-          <Link to="/chat" className="p-2">
-            <MessageCircle className={cn("h-5 w-5", location.pathname === "/chat" && "fill-current")} />
+
+          <Link to="/services" className="p-2">
+            <Stethoscope className={cn("h-5 w-5", location.pathname === "/services" && "fill-current")} />
           </Link>
         </div>
       </header>
@@ -449,27 +489,135 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             <span className="text-[10px] mt-1 font-medium">{item.label}</span>
           </Link>
         ))}
-        <Link
-          to={isProfessional ? "/professional-profile" : (currentPet ? `/pet/${currentPet.id}` : "/feed")}
-          className={cn(
-            "flex flex-col items-center justify-center w-full h-full transition-all",
-            (location.pathname.startsWith("/pet/") && !location.pathname.endsWith("/health")) || location.pathname === "/professional-profile"
-              ? "text-primary"
-              : "text-muted-foreground"
-          )}
-        >
-          <Avatar className="h-6 w-6 border border-current">
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={cn(
+                "flex flex-col items-center justify-center w-full h-full transition-all outline-none",
+                (location.pathname.startsWith("/pet/") && !location.pathname.endsWith("/health")) || location.pathname === "/professional-profile"
+                  ? "text-primary"
+                  : "text-muted-foreground"
+              )}
+            >
+              <Avatar className="h-6 w-6 border border-current">
+                {isProfessional ? (
+                  <AvatarImage src={profile?.professional_avatar_url || undefined} />
+                ) : (
+                  <AvatarImage src={currentPet?.avatar_url || undefined} />
+                )}
+                <AvatarFallback className="text-[8px]">
+                  {isProfessional ? (profile?.full_name?.[0] || 'P') : (currentPet?.name?.[0] || 'P')}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-[10px] mt-1 font-medium">{t("common.profile")}</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" className="w-64 mb-2">
+            <DropdownMenuLabel>{t("common.profile")}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
             {isProfessional ? (
-              <AvatarImage src={profile?.professional_avatar_url || undefined} />
+              <>
+                <DropdownMenuItem asChild>
+                  <Link to="/professional-dashboard" className="flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    {t("menu.professional_panel")}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/professional-profile" className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    {t("common.settings")}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSwitchAccount('user')} className="flex items-center gap-2 text-primary">
+                  <UserIcon className="h-4 w-4" />
+                  {t("menu.switch_to_guardian")}
+                </DropdownMenuItem>
+              </>
             ) : (
-              <AvatarImage src={currentPet?.avatar_url || undefined} />
+              <>
+                <DropdownMenuItem asChild>
+                  <Link to={currentPet ? `/pet/${currentPet.id}` : "/feed"} className="flex items-center gap-2">
+                    <UserIcon className="h-4 w-4" />
+                    {t("menu.pet_profile")}
+                  </Link>
+                </DropdownMenuItem>
+                
+                {myPets && myPets.length > 1 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{t("menu.my_pets")}</DropdownMenuLabel>
+                    {myPets.map(pet => pet.id !== currentPet?.id && (
+                      <DropdownMenuItem key={pet.id} onClick={() => selectPet(pet.id)} className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={pet.avatar_url || undefined} />
+                          <AvatarFallback className="text-[8px]">{pet.name[0]}</AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{pet.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+
+                <DropdownMenuItem asChild>
+                  <Link to="/create-pet" className="flex items-center gap-2">
+                    <PlusCircle className="h-4 w-4" />
+                    {t("menu.add_pet")}
+                  </Link>
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem onClick={() => setIsPetListForDeletionOpen(true)} className="flex items-center gap-2 text-red-600">
+                  <Trash2 className="h-4 w-4" />
+                  {t("menu.delete_pet")}
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => handleSwitchAccount('professional')} className="flex items-center gap-2 text-secondary">
+                  <Briefcase className="h-4 w-4" />
+                  {t("menu.switch_to_professional")}
+                </DropdownMenuItem>
+              </>
             )}
-            <AvatarFallback className="text-[8px]">
-              {isProfessional ? (profile?.full_name?.[0] || 'P') : (currentPet?.name?.[0] || 'P')}
-            </AvatarFallback>
-          </Avatar>
-          <span className="text-[10px] mt-1 font-medium">{t("common.profile")}</span>
-        </Link>
+            
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="flex items-center gap-2">
+                <Languages className="h-4 w-4" />
+                <span>{t("languages.title") || "Idioma"}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent className="min-w-[140px]">
+                  {languages.map((lang) => (
+                    <DropdownMenuItem
+                      key={lang.code}
+                      onClick={() => changeLanguage(lang.code)}
+                      className={cn(
+                        "gap-3 cursor-pointer",
+                        i18n.language === lang.code && "bg-primary/10 font-bold text-primary"
+                      )}
+                    >
+                      <span className="text-lg">{lang.flag}</span>
+                      <span className="text-sm">{lang.name}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+            
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setIsDeleteAccountOpen(true)} className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-4 w-4" />
+              {t("menu.delete_account")}
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+              <LogOut className="h-4 w-4 mr-2" />
+              {t("common.logout")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </nav>
 
       {/* Modais de Exclusão */}
